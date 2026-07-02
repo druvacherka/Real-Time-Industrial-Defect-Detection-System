@@ -1,14 +1,7 @@
-ultralytics>=8.3.0
-torch
-torchvision
 opencv-python
 albumentations
 numpy
-pandas
 matplotlib
-scikit-learn
-PyYAML
-tqdm
-onnx
-onnxruntime
-jupyter
+pandas
+pillow
+pyyaml

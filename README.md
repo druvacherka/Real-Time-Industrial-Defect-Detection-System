@@ -2,67 +2,15 @@
 
 A real-time computer vision system for detecting industrial surface defects using **YOLOv8**.
 
----
+## Dataset Pipeline Overview
 
-## Project Objective
+This repository initializes a standardized dataset pipeline to preprocess, verify, and format the Northeastern University (NEU) Metal Surface Defects Dataset.
 
-Build an edge-deployable defect detection system capable of identifying manufacturing defects from live camera feeds with high accuracy and low latency.
-
----
-
-## Dataset
-
-- **NEU Metal Surface Defects Database**
-- Six defect classes:
-  - Crazing
-  - Inclusion
-  - Patches
-  - Pitted Surface
-  - Rolled-in Scale
-  - Scratches
-
----
-
-## Tech Stack
-
-- Python
-- PyTorch
-- Ultralytics YOLOv8
-- OpenCV
-- ONNX Runtime
-- NVIDIA TensorRT
-- FastAPI
-
----
-
-## Repository Structure
-
-```text
-configs/
-datasets/
-docs/
-exports/
-inference/
-models/
-notebooks/
-results/
-scripts/
-tests/
-training/
-utils/
-weights/
-```
-
----
-
-## Team
-
-- ML Engineer
-- Computer Vision & Data Engineer
-- Backend & Deployment Engineer
-
----
-
-## Current Status
-
-🚧 Project Initialization
+### Dataset Directory Structure
+We organize the data into separate directories for raw input, processed intermediates, YOLO formatting, and reporting:
+* `dataset/raw/`: Original NEU dataset images and annotations.
+* `dataset/processed/`: Standardized dataset formatting output.
+* `dataset/yolo/`: YOLOv8 training/validation splits.
+* `dataset/annotations/`: Converted annotations.
+* `dataset/augmented/`: Augmentation pipeline results.
+* `dataset/reports/`: Automation reports and metrics.
