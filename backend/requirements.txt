@@ -1,0 +1,30 @@
+# ============================================================================
+# Backend Dependencies
+# Project: Real-Time Industrial Defect Detection System
+# ============================================================================
+
+# Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Data Validation
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+
+# File Uploads
+python-multipart>=0.0.9
+
+# Computer Vision
+opencv-python>=4.9.0
+numpy>=1.26.0
+pillow>=10.2.0
+
+# YOLOv8 Model Inference
+ultralytics>=8.1.0
+
+# Logging & Monitoring
+python-json-logger>=2.0.7
+
+# Testing
+pytest>=8.0.0
+httpx>=0.27.0
