@@ -1,0 +1,21 @@
+# Augmentation Settings for Albumentations Pipeline
+# TODO: Add specific augmentation transformations for low-contrast images (e.g. CLAHE, ContrastLimitedAdaptiveHistogramEqualization)
+# TODO: Define and test cutout/mosaic parameters for YOLOv8 model training
+
+augmentations:
+  horizontal_flip:
+    p: 0.5
+  vertical_flip:
+    p: 0.5
+  random_brightness_contrast:
+    brightness_limit: 0.2
+    contrast_limit: 0.2
+    p: 0.5
+  shift_scale_rotate:
+    shift_limit: 0.0625
+    scale_limit: 0.1
+    rotate_limit: 45
+    p: 0.5
+  blur:
+    blur_limit: 3
+    p: 0.2

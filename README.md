@@ -14,3 +14,25 @@ We organize the data into separate directories for raw input, processed intermed
 * `dataset/annotations/`: Converted annotations.
 * `dataset/augmented/`: Augmentation pipeline results.
 * `dataset/reports/`: Automation reports and metrics.
+
+### Dataset Workflow Usage
+
+To manage and verify the dataset setup, the following utility scripts are available:
+
+#### 1. Dataset Verification
+Run the following script to check the integrity of YOLO splits (missing images/labels, empty directories):
+```bash
+python scripts/verify_dataset.py
+```
+
+#### 2. Dataset Statistics
+Run this script to calculate the distribution of images, labels, and class instances across the splits:
+```bash
+python scripts/dataset_statistics.py
+```
+
+#### 3. Dataset Visualization
+Run this script to display random dataset samples complete with bounding box overlays:
+```bash
+python scripts/visualize_dataset.py
+```
