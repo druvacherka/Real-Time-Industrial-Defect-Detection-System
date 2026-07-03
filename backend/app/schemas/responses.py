@@ -37,3 +37,13 @@ class HealthResponse(BaseModel):
         description="API version string",
         json_schema_extra={"example": "1.0.0"},
     )
+
+
+class UploadImageResponse(BaseModel):
+    """Response schema for the initial image upload and prediction endpoint."""
+
+    filename: str = Field(..., description="Name of the uploaded file")
+    status: str = Field(..., description="Status of the upload/processing")
+    message: str = Field(..., description="Detailed status message")
+    prediction: dict | None = Field(default=None, description="Detection prediction details (optional)")
+
