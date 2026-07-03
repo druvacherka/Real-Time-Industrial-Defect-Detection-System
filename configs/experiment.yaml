@@ -1,0 +1,20 @@
+project:
+  name: Real-Time Industrial Defect Detection
+
+dataset:
+  name: NEU-DET
+  annotation_format: Pascal VOC
+
+model:
+  architecture: yolov8n
+  pretrained: true
+
+training:
+  epochs: 100
+  batch_size: 16
+  image_size: 640
+  optimizer: SGD
+  workers: 4
+
+hardware:
+  device: cpu

@@ -1,16 +1,31 @@
-#!/usr/bin/env python3
-"""
-verify_dataset.py
-=================
-Placeholder script for verifying the NEU Metal Surface Defects dataset integrity.
-"""
+from pathlib import Path
 
-def main():
-    # TODO: Implement dataset verification logic.
-    # 1. Check for missing images
-    # 2. Check for missing labels
-    # 3. Check for empty directories
-    print("Dataset verification placeholder script.")
+ROOT = Path("datasets/raw/NEU-DET")
 
-if __name__ == "__main__":
-    main()
+print("=" * 60)
+print("DATASET VERIFICATION")
+print("=" * 60)
+
+assert ROOT.exists(), "Dataset directory not found!"
+
+splits = ["train", "validation"]
+
+for split in splits:
+
+    print(f"\nChecking {split.upper()}")
+
+    split_path = ROOT / split
+
+    image_path = split_path / "images"
+    annotation_path = split_path / "annotations"
+
+    print(f"Images Folder      : {image_path.exists()}")
+    print(f"Annotations Folder : {annotation_path.exists()}")
+
+    image_count = len(list(image_path.rglob("*.*")))
+    xml_count = len(list(annotation_path.glob("*.xml")))
+
+    print(f"Total Images       : {image_count}")
+    print(f"Total XML Files    : {xml_count}")
+
+print("\nDataset verification completed successfully.")
