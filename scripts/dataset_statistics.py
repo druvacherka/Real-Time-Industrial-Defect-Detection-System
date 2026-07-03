@@ -1,16 +1,23 @@
-#!/usr/bin/env python3
-"""
-dataset_statistics.py
-======================
-Placeholder script for calculating NEU dataset statistics.
-"""
+from pathlib import Path
 
-def main():
-    # TODO: Implement statistics calculation.
-    # 1. Total image count
-    # 2. Bounding box count per class
-    # 3. Class balance distribution
-    print("Dataset statistics calculation placeholder script.")
+ROOT = Path("datasets/raw/NEU-DET/train/images")
 
-if __name__ == "__main__":
-    main()
+print("=" * 60)
+print("CLASS DISTRIBUTION")
+print("=" * 60)
+
+total = 0
+
+for folder in sorted(ROOT.iterdir()):
+
+    if folder.is_dir():
+
+        count = len(list(folder.glob("*")))
+
+        total += count
+
+        print(f"{folder.name:<20}{count}")
+
+print("-" * 60)
+
+print(f"Total Images : {total}")
