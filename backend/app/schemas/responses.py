@@ -39,11 +39,34 @@ class HealthResponse(BaseModel):
     )
 
 
+class DetectionResult(BaseModel):
+    """Schema for an individual defect bounding box detection."""
+
+    class_name: str = Field(..., alias="class", description="Name of the detected defect class")
+    confidence: float = Field(..., description="Model confidence score")
+    bounding_box: list[int] = Field(
+        ...,
+        description="Bounding box coordinates [xmin, ymin, xmax, ymax] in pixels",
+        json_schema_extra={"example": [120, 80, 260, 210]},
+    )
+
+    class Config:
+        populate_by_name = True
+
+
+class PredictionDetails(BaseModel):
+    """Detailed prediction schema including list of detections and timing."""
+
+    detections: list[DetectionResult] = Field(..., description="List of detected defect regions")
+    processing_time: str = Field(..., description="Processing and inference duration")
+
+
 class UploadImageResponse(BaseModel):
-    """Response schema for the initial image upload and prediction endpoint."""
+    """Response schema for the image upload and prediction endpoint."""
 
     filename: str = Field(..., description="Name of the uploaded file")
     status: str = Field(..., description="Status of the upload/processing")
     message: str = Field(..., description="Detailed status message")
-    prediction: dict | None = Field(default=None, description="Detection prediction details (optional)")
+    prediction: PredictionDetails | None = Field(default=None, description="Detection prediction details")
+
 
