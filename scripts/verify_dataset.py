@@ -1,31 +1,85 @@
+#!/usr/bin/env python3
+"""
+Dataset Verification Script for Real-Time Industrial Defect Detection System.
+Checks for missing images, missing label files, and empty directories.
+"""
+
+import sys
 from pathlib import Path
 
-ROOT = Path("datasets/raw/NEU-DET")
+# Paths definitions
+DATASET_ROOT = Path("dataset/yolo")
+IMAGES_DIR = DATASET_ROOT / "images"
+LABELS_DIR = DATASET_ROOT / "labels"
 
-print("=" * 60)
-print("DATASET VERIFICATION")
-print("=" * 60)
 
-assert ROOT.exists(), "Dataset directory not found!"
+def verify_dataset():
+    """Performs integrity checks on the dataset splits."""
+    print("=" * 60)
+    print("DATASET INTEGRITY VERIFICATION")
+    print("=" * 60)
 
-splits = ["train", "validation"]
+    if not DATASET_ROOT.exists():
+        print(f"Error: Dataset directory '{DATASET_ROOT}' does not exist.")
+        print("Please initialize dataset directories first.")
+        return False
 
-for split in splits:
+    splits = ["train", "val", "test"]
+    has_issues = False
 
-    print(f"\nChecking {split.upper()}")
+    for split in splits:
+        print(f"\nChecking split: [{split.upper()}]")
+        img_split_dir = IMAGES_DIR / split
+        lbl_split_dir = LABELS_DIR / split
 
-    split_path = ROOT / split
+        # 1. Check folder existence and emptiness
+        for folder in [img_split_dir, lbl_split_dir]:
+            if not folder.exists():
+                print(f"  [MISSING] Folder does not exist: {folder}")
+                has_issues = True
+                continue
 
-    image_path = split_path / "images"
-    annotation_path = split_path / "annotations"
+            # Exclude .gitkeep or other dotfiles when checking empty folders
+            visible_files = [f for f in folder.iterdir() if not f.name.startswith(".")]
+            if len(visible_files) == 0:
+                print(f"  [EMPTY] Folder is empty: {folder}")
 
-    print(f"Images Folder      : {image_path.exists()}")
-    print(f"Annotations Folder : {annotation_path.exists()}")
+        # 2. Match images and labels if directories exist
+        if img_split_dir.exists() and lbl_split_dir.exists():
+            img_files = {f.stem: f for f in img_split_dir.iterdir() if f.is_file() and not f.name.startswith(".")}
+            lbl_files = {f.stem: f for f in lbl_split_dir.iterdir() if f.is_file() and not f.name.startswith(".")}
 
-    image_count = len(list(image_path.rglob("*.*")))
-    xml_count = len(list(annotation_path.glob("*.xml")))
+            # Check for images without corresponding labels
+            missing_labels = img_files.keys() - lbl_files.keys()
+            if missing_labels:
+                print(f"  [WARNING] {len(missing_labels)} images have no corresponding label file:")
+                for stem in sorted(list(missing_labels))[:5]:
+                    print(f"    - {img_files[stem].name} is missing label file")
+                if len(missing_labels) > 5:
+                    print(f"    - ... and {len(missing_labels) - 5} more")
+                has_issues = True
 
-    print(f"Total Images       : {image_count}")
-    print(f"Total XML Files    : {xml_count}")
+            # Check for labels without corresponding images
+            missing_images = lbl_files.keys() - img_files.keys()
+            if missing_images:
+                print(f"  [WARNING] {len(missing_images)} label files have no corresponding image:")
+                for stem in sorted(list(missing_images))[:5]:
+                    print(f"    - {lbl_files[stem].name} is missing image file")
+                if len(missing_images) > 5:
+                    print(f"    - ... and {len(missing_images) - 5} more")
+                has_issues = True
 
-print("\nDataset verification completed successfully.")
+            if not missing_labels and not missing_images:
+                print(f"  [OK] All images and label files match correctly (Count: {len(img_files)}).")
+
+    print("\n" + "=" * 60)
+    if has_issues:
+        print("Verification completed with warnings/errors. Please inspect logs.")
+    else:
+        print("Verification completed successfully. No issues detected.")
+    print("=" * 60)
+    return not has_issues
+
+
+if __name__ == "__main__":
+    verify_dataset()
