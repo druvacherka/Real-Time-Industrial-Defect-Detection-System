@@ -7,7 +7,7 @@ mounted onto the FastAPI application instance.
 
 from fastapi import APIRouter
 
-from app.api.endpoints import root, health
+from app.api.endpoints import root, health, predict
 
 # Create the top-level API router
 api_router = APIRouter()
@@ -15,3 +15,5 @@ api_router = APIRouter()
 # Register individual endpoint routers
 api_router.include_router(root.router)
 api_router.include_router(health.router)
+api_router.include_router(predict.router)
+
