@@ -1,133 +1,153 @@
 """
-endpoints/predict.py — Image Defect Prediction Endpoint
-==========================================================
-Handles uploaded images, performs validation, saves them temporarily,
-and returns defect detection results.
+Image Prediction Endpoint
+=========================
+Handles image upload, validation, and prediction requests.
+
+Author: prajwaledu802-coder
+Date: 2026-07-04
 """
 
-import shutil
+import os
+import uuid
 import time
+import logging
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi.responses import JSONResponse
 
-from app.schemas.responses import UploadImageResponse, PredictionDetails, DetectionResult
-from app.services.image_service import image_preprocessor
-from app.models.model_loader import model_wrapper
-from app.core.logger import get_logger
-from app.core.config import BASE_DIR
+from backend.app.schemas.responses import UploadImageResponse
 
-logger = get_logger(__name__)
+logger = logging.getLogger("defect_detection.predict")
 
-router = APIRouter()
+router = APIRouter(prefix="/predict", tags=["Prediction"])
 
-# Define temporary storage directory for uploaded files
-TEMP_UPLOAD_DIR = BASE_DIR / "temp"
-TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-# Make sure model is loaded on startup or first request
-model_wrapper.load_model()
-
-# Allowed image MIME types and extensions
+# Configuration
+UPLOAD_DIR = Path("backend/uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+MAX_FILE_SIZE_MB = 10
+
+
+def _validate_image_format(filename: str) -> str:
+    """Validate uploaded file has a supported image extension."""
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "unsupported_format",
+                "message": f"File format '{ext}' is not supported. "
+                           f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+                "filename": filename,
+            },
+        )
+    return ext
+
+
+def _generate_request_id() -> str:
+    """Generate a unique request identifier for tracking."""
+    return str(uuid.uuid4())[:12]
 
 
 @router.post(
-    "/predict/image",
+    "/image",
     response_model=UploadImageResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Predict defects in an uploaded image",
-    description=(
-        "Upload a metal surface image (JPG, JPEG, PNG) to detect defects. "
-        "The image is validated, processed, and passed to the model."
-    ),
-    tags=["Prediction"],
+    summary="Upload an image for defect prediction",
+    description="Upload a single image file (JPG, JPEG, PNG) for defect detection. "
+                "The image will be validated, saved temporarily, and a prediction "
+                "response will be returned.",
 )
-async def predict_image(file: UploadFile = File(...)):
+async def predict_image(
+    request: Request,
+    file: UploadFile = File(
+        ...,
+        description="Image file to analyze for defects",
+    ),
+):
     """
-    Endpoint to receive an uploaded image, validate its format,
-    save it to a temporary directory, preprocess it, and run defect prediction.
+    Process an uploaded image for defect detection.
+
+    Workflow:
+        1. Generate unique request ID
+        2. Validate file format
+        3. Read and validate file size
+        4. Save file temporarily
+        5. Return prediction response (placeholder)
     """
-    logger.info("Received image upload request: %s", file.filename)
+    request_id = _generate_request_id()
     start_time = time.time()
 
-    # ── 1. Validate file extension ──────────────────────────────────────────
-    file_path = Path(file.filename)
-    extension = file_path.suffix.lower()
-    if extension not in ALLOWED_EXTENSIONS:
+    logger.info(
+        f"[{request_id}] Received prediction request: "
+        f"filename={file.filename}, content_type={file.content_type}"
+    )
+
+    # Step 1 — Validate format
+    ext = _validate_image_format(file.filename)
+
+    # Step 2 — Read file contents
+    try:
+        contents = await file.read()
+    except Exception as exc:
+        logger.error(f"[{request_id}] Failed to read uploaded file: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "read_failure", "message": "Failed to read uploaded file"},
+        )
+
+    # Step 3 — Validate file size
+    file_size_mb = len(contents) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
         logger.warning(
-            "Rejected file upload: %s. Invalid extension: %s",
-            file.filename,
-            extension,
+            f"[{request_id}] File too large: {file_size_mb:.2f} MB "
+            f"(max {MAX_FILE_SIZE_MB} MB)"
         )
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Unsupported file extension: {extension}. "
-                f"Supported formats: {', '.join(ALLOWED_EXTENSIONS)}"
-            ),
+            status_code=413,
+            detail={
+                "error": "file_too_large",
+                "message": f"File size {file_size_mb:.2f} MB exceeds "
+                           f"maximum {MAX_FILE_SIZE_MB} MB",
+            },
         )
 
-    # ── 2. Save file temporarily ────────────────────────────────────────────
-    temp_file_path = TEMP_UPLOAD_DIR / file.filename
+    # Step 4 — Validate file is not empty
+    if len(contents) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "empty_file", "message": "Uploaded file is empty"},
+        )
+
+    # Step 5 — Save temporarily
+    save_filename = f"{request_id}_{file.filename}"
+    save_path = UPLOAD_DIR / save_filename
     try:
-        with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        logger.info("Saved temporary upload file to: %s", temp_file_path)
-    except Exception as exc:
-        logger.error(
-            "Failed to save uploaded file %s: %s",
-            file.filename,
-            str(exc),
+        with open(save_path, "wb") as f:
+            f.write(contents)
+        logger.info(f"[{request_id}] Saved uploaded image to {save_path}")
+    except IOError as exc:
+        logger.error(f"[{request_id}] Failed to save file: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "save_failure", "message": "Failed to save uploaded file"},
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save uploaded image.",
-        ) from exc
 
-    # ── 3. Preprocess the image ─────────────────────────────────────────────
-    try:
-        preprocessed_img = image_preprocessor.preprocess_image(temp_file_path)
-    except ValueError as val_err:
-        logger.error("Preprocessing error for %s: %s", file.filename, str(val_err))
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(val_err),
-        ) from val_err
+    # Step 6 — Calculate processing time
+    processing_time = time.time() - start_time
 
-    # ── 4. Model Prediction ──────────────────────────────────────────────────
-    try:
-        detections = model_wrapper.predict(preprocessed_img)
-    except Exception as exc:
-        logger.error("Inference failure for %s: %s", file.filename, str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Model prediction failed.",
-        ) from exc
-
-    # ── 5. Format results and latency ───────────────────────────────────────
-    latency_ms = int((time.time() - start_time) * 1000)
-    processing_time_str = f"{latency_ms} ms"
-
-    # Convert detection dicts to Pydantic objects
-    detection_objects = [
-        DetectionResult(
-            class_name=det["class_name"],
-            confidence=det["confidence"],
-            bounding_box=det["bounding_box"]
-        )
-        for det in detections
-    ]
-
-    prediction_details = PredictionDetails(
-        detections=detection_objects,
-        processing_time=processing_time_str
+    logger.info(
+        f"[{request_id}] Upload processed successfully in "
+        f"{processing_time * 1000:.1f} ms"
     )
 
     return UploadImageResponse(
+        request_id=request_id,
         filename=file.filename,
         status="success",
-        message="Image processed and checked for defects successfully",
-        prediction=prediction_details,
+        message="Image uploaded successfully",
+        file_size_mb=round(file_size_mb, 3),
+        processing_time_ms=round(processing_time * 1000, 1),
+        prediction=None,
     )
-
