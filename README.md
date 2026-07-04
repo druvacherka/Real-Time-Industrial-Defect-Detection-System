@@ -61,21 +61,53 @@ Below is the directory structure layout for this project and the explanation of 
 
 ---
 
+## Backend API
+
+The project includes a FastAPI backend located under the `backend/` directory.
+
+### Features
+- **FastAPI Core**: Standard API boilerplate with logging, config management, and exception handling.
+- **Defect Prediction Endpoint**: `POST /predict/image` supporting JPG, JPEG, and PNG image uploads.
+- **Image Preprocessing Service**: BGR to RGB conversion, YOLO dimension resizing, and pixel normalization.
+- **Model Loader Interface**: swappable wrapper supporting placeholder predictions for model integration.
+
+### Running the Backend
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the development server:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+---
+
 ## Scripts Usage
 
 ### 1. Dataset Verification
-Run the following script to check the integrity of YOLO splits (missing images/labels, empty directories):
+Run the following script to check the integrity of YOLO splits, detect corrupted files, and count class distribution:
 ```bash
 python scripts/verify_dataset.py
 ```
 
-### 2. Dataset Statistics
-Run this script to calculate the distribution of images, labels, and class instances across the splits:
+### 2. Dataset Conversion
+To convert the NEU-DET raw dataset into split YOLO format and generate `data.yaml`:
 ```bash
-python scripts/dataset_stats.py
+python scripts/convert_to_yolo.py
 ```
 
-### 3. Sample Visualization
+### 3. Preprocessing Pipeline
+To run bulk resizing and normalization on raw dataset splits:
+```bash
+python scripts/preprocess_pipeline.py
+```
+
+### 4. Sample Visualization
 Run this script to display random dataset samples complete with bounding box overlays:
 ```bash
 python scripts/visualize_samples.py
@@ -85,12 +117,12 @@ python scripts/visualize_samples.py
 
 ## Team
 
-- ML Engineer
-- Computer Vision & Data Engineer
-- Backend & Deployment Engineer
+- **Dhruv** (ML Engineer)
+- **Saniya** (Computer Vision & Data Engineer)
+- **Prajwal** (Backend & Deployment Engineer)
 
 ---
 
 ## Current Status
 
-🚧 Project Initialization and Dataset Pipeline Setup Completed
+🚧 Project Initialization, Dataset Conversion, Preprocessing Pipeline, and FastAPI Backend Endpoints Completed
