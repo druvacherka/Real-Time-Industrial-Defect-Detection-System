@@ -1,53 +1,40 @@
 """
-schemas/responses.py — Pydantic Response Models
-=================================================
-Defines the response shapes for all API endpoints.
-These models are used by FastAPI for automatic JSON serialisation
-and Swagger documentation.
+API Response Schemas
+=====================
+Pydantic models for structured API responses.
+
+Author: prajwaledu802-coder
+Date: 2026-07-04
 """
 
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
-class RootResponse(BaseModel):
-    """Response schema for the root endpoint (GET /)."""
-
-    message: str = Field(
-        ...,
-        description="Welcome message from the API",
-        json_schema_extra={"example": "Industrial Defect Detection API"},
-    )
-
-
 class HealthResponse(BaseModel):
-    """Response schema for the health-check endpoint (GET /health)."""
-
-    status: str = Field(
-        ...,
-        description="Current service status",
-        json_schema_extra={"example": "healthy"},
-    )
-    service: str = Field(
-        ...,
-        description="Name of the service",
-        json_schema_extra={"example": "Industrial Defect Detection"},
-    )
-    version: str = Field(
-        ...,
-        description="API version string",
-        json_schema_extra={"example": "1.0.0"},
-    )
+    """Health check response."""
+    status: str = Field(..., example="healthy")
+    version: str = Field(..., example="0.1.0")
 
 
-class DetectionResult(BaseModel):
-    """Schema for an individual defect bounding box detection."""
+class RootResponse(BaseModel):
+    """Root endpoint response."""
+    project: str
+    description: str
+    docs_url: str
 
-    class_name: str = Field(..., alias="class", description="Name of the detected defect class")
-    confidence: float = Field(..., description="Model confidence score")
-    bounding_box: list[int] = Field(
+
+class DetectionItem(BaseModel):
+    """Single defect detection result."""
+    class_name: str = Field(..., alias="class", example="scratches")
+    class_id: int = Field(..., example=5)
+    confidence: float = Field(..., ge=0.0, le=1.0, example=0.96)
+    bounding_box: List[int] = Field(
         ...,
-        description="Bounding box coordinates [xmin, ymin, xmax, ymax] in pixels",
-        json_schema_extra={"example": [120, 80, 260, 210]},
+        min_items=4,
+        max_items=4,
+        example=[120, 80, 240, 210],
+        description="Bounding box coordinates [x1, y1, x2, y2]",
     )
 
     class Config:
@@ -55,18 +42,39 @@ class DetectionResult(BaseModel):
 
 
 class PredictionDetails(BaseModel):
-    """Detailed prediction schema including list of detections and timing."""
-
-    detections: list[DetectionResult] = Field(..., description="List of detected defect regions")
-    processing_time: str = Field(..., description="Processing and inference duration")
+    """Full prediction result with detections and metadata."""
+    detections: List[DetectionItem] = Field(default_factory=list)
+    detection_count: int = Field(default=0, example=2)
+    processing_time: str = Field(default="0 ms", example="34 ms")
+    image_size: List[int] = Field(default_factory=lambda: [640, 640])
+    model: str = Field(default="yolov8n_defects")
 
 
 class UploadImageResponse(BaseModel):
-    """Response schema for the image upload and prediction endpoint."""
+    """Response for the image upload prediction endpoint."""
+    request_id: str = Field(..., example="a1b2c3d4e5f6")
+    filename: str = Field(..., example="sample.jpg")
+    status: str = Field(..., example="success")
+    message: str = Field(..., example="Image uploaded successfully")
+    file_size_mb: float = Field(default=0.0, example=1.234)
+    processing_time_ms: float = Field(default=0.0, example=34.5)
+    prediction: Optional[PredictionDetails] = None
 
-    filename: str = Field(..., description="Name of the uploaded file")
-    status: str = Field(..., description="Status of the upload/processing")
-    message: str = Field(..., description="Detailed status message")
-    prediction: PredictionDetails | None = Field(default=None, description="Detection prediction details")
+
+class ErrorResponse(BaseModel):
+    """Standard error response."""
+    error: str = Field(..., example="unsupported_format")
+    message: str = Field(..., example="File format '.gif' is not supported.")
+    detail: Optional[str] = None
 
 
+class ModelInfoResponse(BaseModel):
+    """Model metadata response."""
+    model_name: str = Field(..., example="yolov8n_defects")
+    model_path: str
+    is_loaded: bool
+    confidence_threshold: float
+    iou_threshold: float
+    device: str
+    num_classes: int
+    classes: dict
