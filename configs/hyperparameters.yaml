@@ -1,0 +1,57 @@
+# Model Training Hyperparameters
+# ================================
+# Extended hyperparameter configuration for YOLOv8 training
+# on the NEU Metal Surface Defects dataset.
+#
+# Author: druvacherka
+# Date: 2026-07-04
+
+model:
+  architecture: yolov8n
+  pretrained: true
+  weights: yolov8n.pt
+
+training:
+  epochs: 100
+  batch_size: 16
+  image_size: 640
+  optimizer: SGD
+  learning_rate: 0.01
+  lr_final: 0.01
+  momentum: 0.937
+  weight_decay: 0.0005
+  patience: 50
+
+warmup:
+  epochs: 3.0
+  momentum: 0.8
+  bias_lr: 0.1
+
+augmentation:
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.0
+
+loss_weights:
+  box: 7.5
+  cls: 0.5
+  dfl: 1.5
+
+hardware:
+  device: cpu
+  workers: 4
+
+output:
+  project: results
+  name: defect_detection
+  save_period: -1
+  verbose: true
