@@ -80,10 +80,27 @@ The project includes a FastAPI backend located under the `backend/` directory.
    ```bash
    pip install -r requirements.txt
    ```
-3. Run the development server:
+3. Configure environment (optional):
+   ```bash
+   cp .env.example .env
+   # Edit .env to customize settings
+   ```
+4. Run the development server:
    ```bash
    uvicorn app.main:app --reload
    ```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_TITLE` | Real-Time Industrial Defect Detection API | Swagger title |
+| `API_VERSION` | 0.2.0 | API version |
+| `MODEL_PATH` | models/yolov8n_defects.pt | Path to YOLO weights |
+| `MODEL_CONFIDENCE_THRESHOLD` | 0.25 | Min detection confidence |
+| `UPLOAD_DIR` | backend/uploads | Temp upload directory |
+| `LOG_LEVEL` | INFO | Logging level |
+| `DEBUG` | false | Enable debug mode |
 
 ---
 

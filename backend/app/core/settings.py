@@ -1,75 +1,117 @@
 """
-settings.py — Pydantic Settings Management
-=============================================
-Typed application settings using Pydantic's BaseSettings.
-Reads from environment variables and .env files automatically.
+Application Settings using Pydantic BaseSettings
+==================================================
+Centralized configuration management with .env support.
+
+Author: prajwaledu802-coder
+Date: 2026-07-05
 """
 
-from pydantic import Field
+from pathlib import Path
+from typing import Optional
+
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
-class AppSettings(BaseSettings):
+class Settings(BaseSettings):
     """
-    Application-wide settings with environment variable support.
+    Application settings loaded from environment variables and .env file.
 
-    Pydantic will automatically read matching environment variables
-    (case-insensitive) or fall back to the defaults specified here.
+    Configuration hierarchy (highest to lowest priority):
+        1. Environment variables
+        2. .env file
+        3. Default values defined here
     """
 
-    # ── App Metadata ────────────────────────────────────────────────────
-    app_name: str = Field(
-        default="Industrial Defect Detection API",
-        description="Display name for the API service",
+    # ---- API Configuration ----
+    API_TITLE: str = Field(
+        default="Real-Time Industrial Defect Detection API",
+        description="Title displayed in Swagger docs",
     )
-    app_version: str = Field(
-        default="1.0.0",
+    API_VERSION: str = Field(
+        default="0.2.0",
         description="Current API version",
     )
-    debug: bool = Field(
-        default=False,
-        description="Enable debug mode (verbose logging, auto-reload)",
+    API_DESCRIPTION: str = Field(
+        default="FastAPI backend for YOLOv8-based industrial surface defect detection",
     )
+    API_HOST: str = Field(default="0.0.0.0", description="Server bind address")
+    API_PORT: int = Field(default=8000, description="Server port")
+    DEBUG: bool = Field(default=False, description="Enable debug mode")
 
-    # ── Server ──────────────────────────────────────────────────────────
-    host: str = Field(default="0.0.0.0", description="Server bind address")
-    port: int = Field(default=8000, description="Server port")
-
-    # ── Model Inference ─────────────────────────────────────────────────
-    model_weights_path: str = Field(
-        default="weights/best.pt",
-        description="Path to the YOLOv8 trained weights file",
+    # ---- Model Configuration ----
+    MODEL_PATH: str = Field(
+        default="models/yolov8n_defects.pt",
+        description="Path to the YOLOv8 model weights file",
     )
-    model_confidence: float = Field(
-        default=0.5,
+    MODEL_CONFIDENCE_THRESHOLD: float = Field(
+        default=0.25,
         ge=0.0,
         le=1.0,
-        description="Minimum confidence threshold for detections",
+        description="Minimum confidence for detections",
     )
-    model_iou_threshold: float = Field(
+    MODEL_IOU_THRESHOLD: float = Field(
         default=0.45,
         ge=0.0,
         le=1.0,
-        description="IoU threshold for non-max suppression",
+        description="IoU threshold for NMS",
+    )
+    MODEL_DEVICE: str = Field(
+        default="auto",
+        description="Inference device: 'cpu', 'cuda', 'auto'",
     )
 
-    # ── CORS ────────────────────────────────────────────────────────────
-    allowed_origins: list[str] = Field(
-        default=["*"],
-        description="List of allowed CORS origins",
+    # ---- Upload Configuration ----
+    UPLOAD_DIR: str = Field(
+        default="backend/uploads",
+        description="Directory for temporarily stored uploaded images",
     )
-
-    # ── Upload ──────────────────────────────────────────────────────────
-    max_upload_size_mb: int = Field(
+    MAX_UPLOAD_SIZE_MB: int = Field(
         default=10,
-        description="Maximum upload file size in megabytes",
+        description="Maximum allowed upload file size in MB",
     )
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    # ---- Image Preprocessing ----
+    INPUT_IMAGE_WIDTH: int = Field(default=640, description="YOLO input width")
+    INPUT_IMAGE_HEIGHT: int = Field(default=640, description="YOLO input height")
+    NORMALIZE_IMAGES: bool = Field(default=True, description="Normalize pixel values")
+
+    # ---- Logging Configuration ----
+    LOG_LEVEL: str = Field(
+        default="INFO",
+        description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL",
+    )
+    LOG_FORMAT: str = Field(
+        default="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        description="Python logging format string",
+    )
+    LOG_DIR: str = Field(
+        default="logs",
+        description="Directory for log files",
+    )
+
+    # ---- CORS ----
+    CORS_ORIGINS: str = Field(
+        default="*",
+        description="Comma-separated list of allowed CORS origins",
+    )
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True,
+        "extra": "ignore",
+    }
 
 
-# Singleton instance — import this wherever settings are needed
-settings = AppSettings()
+# Singleton instance
+_settings: Optional[Settings] = None
+
+
+def get_settings() -> Settings:
+    """Get or create the global Settings instance."""
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
