@@ -1,0 +1,35 @@
+{
+  "splits": {
+    "train": {
+      "images": 0,
+      "labels": 0,
+      "duplicates": 0,
+      "annotation_issues": 0,
+      "invalid_bboxes": 0,
+      "duplicate_groups": [],
+      "annotation_errors": []
+    },
+    "val": {
+      "images": 0,
+      "labels": 0,
+      "duplicates": 0,
+      "annotation_issues": 0,
+      "invalid_bboxes": 0,
+      "duplicate_groups": [],
+      "annotation_errors": []
+    },
+    "test": {
+      "images": 0,
+      "labels": 0,
+      "duplicates": 0,
+      "annotation_issues": 0,
+      "invalid_bboxes": 0,
+      "duplicate_groups": [],
+      "annotation_errors": []
+    }
+  },
+  "total_images": 0,
+  "total_duplicates": 0,
+  "total_annotation_issues": 0,
+  "total_invalid_bboxes": 0
+}
