@@ -16,7 +16,7 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 
 # Import the model loader from the app models directory
-from backend.app.models.model_loader import get_model, YOLOv8ModelWrapper, PredictionResponse
+from app.models.model_loader import get_model, YOLOv8ModelWrapper, PredictionResponse
 
 logger = logging.getLogger("defect_detection.inference")
 

@@ -12,7 +12,7 @@ import os
 import logging
 from pathlib import Path
 
-from backend.app.core.settings import get_settings
+from app.core.settings import get_settings
 
 # Load settings singleton
 settings = get_settings()
