@@ -18,7 +18,8 @@ from training.evaluate import main as evaluate_main
 
 class TestSkeletons(unittest.TestCase):
     
-    def test_train_skeleton_args(self):
+    @patch('training.train.YOLO.train')
+    def test_train_skeleton_args(self, mock_train):
         """Tests that train.py parses configurations and overrides correctly."""
         test_args = [
             "train.py",
@@ -33,6 +34,7 @@ class TestSkeletons(unittest.TestCase):
             self.assertEqual(params["batch_size"], 8)
             self.assertEqual(params["device"], "cpu")
             self.assertEqual(params["model_arch"], "yolov8m")
+            mock_train.assert_called_once()
             
     def test_predict_skeleton_args(self):
         """Tests that predict.py parses arguments correctly."""
