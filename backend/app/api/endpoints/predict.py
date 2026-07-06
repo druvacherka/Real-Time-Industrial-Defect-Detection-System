@@ -22,6 +22,9 @@ from app.schemas.responses import (
     UploadImageResponse,
     PredictionDetails,
     DetectionItem,
+    UploadVideoResponse,
+    VideoPredictionDetails,
+    FrameDetectionSummary,
 )
 from app.services.image_service import ImagePreprocessingService, ImageValidationError
 from app.services.inference_service import get_inference_service
@@ -35,6 +38,9 @@ UPLOAD_DIR = Path("backend/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 MAX_FILE_SIZE_MB = 10
+
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov"}
+MAX_VIDEO_SIZE_MB = 50
 
 # Initialize services
 preprocessor = ImagePreprocessingService(target_size=(640, 640), normalize=True)
@@ -192,6 +198,143 @@ async def predict_image(
         filename=file.filename,
         status="success",
         message="Prediction completed successfully",
+        file_size_mb=round(file_size_mb, 3),
+        processing_time_ms=round(processing_time * 1000, 1),
+        prediction=prediction_details,
+    )
+
+
+def _validate_video_format(filename: str) -> str:
+    """Validate uploaded file has a supported video extension."""
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "unsupported_format",
+                "message": f"File format '{ext}' is not supported. "
+                           f"Allowed: {', '.join(sorted(ALLOWED_VIDEO_EXTENSIONS))}",
+                "filename": filename,
+            },
+        )
+    return ext
+
+
+@router.post(
+    "/video",
+    response_model=UploadVideoResponse,
+    summary="Upload a video for defect prediction",
+    description=(
+        "Upload a single video file (MP4, AVI, MOV) for defect detection. "
+        "The video is validated, saved temporarily to disk, analyzed with OpenCV "
+        "to extract metadata (FPS, frame count, resolution), run through the "
+        "YOLO inference service, and returns aggregated defect summary metrics."
+    ),
+    responses={
+        400: {"description": "Invalid file format or empty file"},
+        413: {"description": "File too large"},
+        500: {"description": "Internal processing error"},
+    },
+)
+async def predict_video(
+    request: Request,
+    file: UploadFile = File(
+        ...,
+        description="Video file to analyze for defects (MP4, AVI, MOV)",
+    ),
+):
+    """
+    End-to-end video defect prediction workflow.
+    """
+    request_id = _generate_request_id()
+    start_time = time.time()
+
+    logger.info(
+        f"[{request_id}] Video prediction request received: "
+        f"filename={file.filename}, content_type={file.content_type}"
+    )
+
+    # Step 1 — Validate format
+    ext = _validate_video_format(file.filename)
+
+    # Step 2 — Read file contents
+    try:
+        contents = await file.read()
+    except Exception as exc:
+        logger.error(f"[{request_id}] Failed to read uploaded file: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to read uploaded file")
+
+    # Step 3 — Validate file size
+    file_size_mb = len(contents) / (1024 * 1024)
+    if file_size_mb > MAX_VIDEO_SIZE_MB:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size {file_size_mb:.2f} MB exceeds maximum {MAX_VIDEO_SIZE_MB} MB",
+        )
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Step 4 — Save temporarily to disk (OpenCV needs a file path)
+    save_filename = f"{request_id}_{file.filename}"
+    save_path = UPLOAD_DIR / save_filename
+    try:
+        with open(save_path, "wb") as f:
+            f.write(contents)
+        logger.info(f"[{request_id}] Saved video to {save_path}")
+    except IOError as exc:
+        logger.error(f"[{request_id}] Failed to save file: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file")
+
+    # Step 5 — Run inference
+    try:
+        inference_svc = get_inference_service()
+        prediction_result = inference_svc.predict_video(save_path)
+        if prediction_result.get("status") == "error":
+            raise ValueError(prediction_result.get("error_message", "Unknown error"))
+        logger.info(f"[{request_id}] Video inference complete")
+    except Exception as exc:
+        logger.error(f"[{request_id}] Video inference failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Video processing failed: {str(exc)}")
+    finally:
+        # Clean up video file after processing to save disk space
+        if save_path.exists():
+            try:
+                os.remove(save_path)
+                logger.info(f"[{request_id}] Cleaned up temp video file {save_path}")
+            except Exception as e:
+                logger.warning(f"[{request_id}] Failed to delete temp video file: {e}")
+
+    # Step 6 — Build response
+    processing_time = time.time() - start_time
+
+    summary_items = []
+    for item in prediction_result.get("detection_summary", []):
+        summary_items.append(FrameDetectionSummary(
+            **{"class": item["class"]},
+            class_id=item["class_id"],
+            count=item["count"],
+        ))
+
+    prediction_details = VideoPredictionDetails(
+        detection_summary=summary_items,
+        total_detections=prediction_result.get("total_detections", 0),
+        processing_time=f"{processing_time:.2f} s",
+        frame_count=prediction_result.get("frame_count", 0),
+        fps=prediction_result.get("fps", 0.0),
+        video_duration_seconds=prediction_result.get("video_duration_seconds", 0.0),
+        video_resolution=prediction_result.get("video_resolution", [0, 0]),
+        model=prediction_result.get("model", "yolov8n_defects"),
+    )
+
+    logger.info(
+        f"[{request_id}] Video request completed in {processing_time * 1000:.1f} ms"
+    )
+
+    return UploadVideoResponse(
+        request_id=request_id,
+        filename=file.filename,
+        status="success",
+        message="Video processed successfully",
         file_size_mb=round(file_size_mb, 3),
         processing_time_ms=round(processing_time * 1000, 1),
         prediction=prediction_details,

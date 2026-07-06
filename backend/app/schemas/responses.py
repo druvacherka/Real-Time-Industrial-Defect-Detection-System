@@ -78,3 +78,36 @@ class ModelInfoResponse(BaseModel):
     device: str
     num_classes: int
     classes: dict
+
+
+class FrameDetectionSummary(BaseModel):
+    """Detection summary for a specific defect class in a video."""
+    class_name: str = Field(..., alias="class", example="scratches")
+    class_id: int = Field(..., example=5)
+    count: int = Field(..., example=3)
+
+    class Config:
+        populate_by_name = True
+
+
+class VideoPredictionDetails(BaseModel):
+    """Full prediction result for video."""
+    detection_summary: List[FrameDetectionSummary] = Field(default_factory=list)
+    total_detections: int = Field(default=0, example=15)
+    processing_time: str = Field(default="0 ms", example="2.3s")
+    frame_count: int = Field(default=0, example=120)
+    fps: float = Field(default=0.0, example=30.0)
+    video_duration_seconds: float = Field(default=0.0, example=4.0)
+    video_resolution: List[int] = Field(default_factory=lambda: [1920, 1080])
+    model: str = Field(default="yolov8n_defects")
+
+
+class UploadVideoResponse(BaseModel):
+    """Response for the video upload prediction endpoint."""
+    request_id: str = Field(..., example="b2c3d4e5f6g7")
+    filename: str = Field(..., example="sample_video.mp4")
+    status: str = Field(..., example="success")
+    message: str = Field(..., example="Video processed successfully")
+    file_size_mb: float = Field(default=0.0, example=4.52)
+    processing_time_ms: float = Field(default=0.0, example=1250.5)
+    prediction: Optional[VideoPredictionDetails] = None
