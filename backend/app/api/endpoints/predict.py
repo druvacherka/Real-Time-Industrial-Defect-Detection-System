@@ -18,13 +18,13 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from backend.app.schemas.responses import (
+from app.schemas.responses import (
     UploadImageResponse,
     PredictionDetails,
     DetectionItem,
 )
-from backend.app.services.image_service import ImagePreprocessingService, ImageValidationError
-from backend.app.services.inference_service import get_inference_service
+from app.services.image_service import ImagePreprocessingService, ImageValidationError
+from app.services.inference_service import get_inference_service
 
 logger = logging.getLogger("defect_detection.predict")
 
