@@ -106,26 +106,32 @@ The project includes a FastAPI backend located under the `backend/` directory.
 
 ## Scripts Usage
 
-### 1. Dataset Verification
-Run the following script to check the integrity of YOLO splits, detect corrupted files, and count class distribution:
+### 1. Raw Dataset Verification
+Check for integrity, corruptions, and duplicate images in the raw NEU-DET folders:
 ```bash
-python scripts/verify_dataset.py
+python scripts/verify_raw_dataset.py
 ```
 
-### 2. Dataset Conversion
-To convert the NEU-DET raw dataset into split YOLO format and generate `data.yaml`:
+### 2. Dataset Conversion & Splitting
+Convert Pascal VOC XML annotations to YOLOv8 format and perform a stratified split (70% train, 20% validation, 10% test):
 ```bash
 python scripts/convert_to_yolo.py
 ```
 
-### 3. Preprocessing Pipeline
-To run bulk resizing and normalization on raw dataset splits:
+### 3. Data Augmentation & Balancing
+Apply an Albumentations pipeline (flips, rotations, blur, CLAHE) to balance minority class instances in the training split:
 ```bash
-python scripts/preprocess_pipeline.py
+python scripts/augment_dataset.py
 ```
 
-### 4. Sample Visualization
-Run this script to display random dataset samples complete with bounding box overlays:
+### 4. Quality Reports & Statistics
+Compute split distributions, save visualization charts, and write a quality report:
+```bash
+python scripts/generate_reports.py
+```
+
+### 5. Sample Visualization
+Display random dataset samples complete with bounding box overlays:
 ```bash
 python scripts/visualize_samples.py
 ```
@@ -142,4 +148,5 @@ python scripts/visualize_samples.py
 
 ## Current Status
 
-🚧 Project Initialization, Dataset Conversion, Preprocessing Pipeline, and FastAPI Backend Endpoints Completed
+✅ Dataset Preparation, Verification, Conversion, Augmentation, and Balancing Pipeline Completed.
+📊 Quality reports and class distribution charts are generated under `dataset/reports/`.

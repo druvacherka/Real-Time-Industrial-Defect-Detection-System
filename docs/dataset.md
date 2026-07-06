@@ -35,12 +35,17 @@ Where:
 - `x_center`, `y_center`: Bounding box center coordinates, normalized by the image's width and height (values range from 0.0 to 1.0).
 - `width`, `height`: Bounding box dimensions, normalized by the image's width and height (values range from 0.0 to 1.0).
 
-## Future Preprocessing Pipeline
-To prepare raw NEU-DET data (which uses Pascal VOC XML annotations) for training:
-1. **Format Conversion**: Convert XML coordinates (`xmin`, `ymin`, `xmax`, `ymax`) to YOLO normalized center-based coordinates (`x_center`, `y_center`, `width`, `height`).
-2. **Train-Val-Test Splitting**: Partition the 1,800 images into:
+## Completed Preprocessing & Augmentation Pipeline
+To prepare raw NEU-DET data (which uses Pascal VOC XML annotations) for training, the pipeline executes the following steps:
+1. **Verification**: Detects corrupted files, checks for missing annotations, and flags duplicate image sets.
+2. **Format Conversion**: Converts XML coordinates (`xmin`, `ymin`, `xmax`, `ymax`) to YOLO normalized center-based coordinates (`x_center`, `y_center`, `width`, `height`).
+3. **Train-Val-Test Splitting**: Partition the 1,800 images into:
    - 70% Train (1,260 images)
    - 20% Validation (360 images)
    - 10% Test (180 images)
    Using a stratified split to maintain class balance across sets.
-3. **Image Contrast Enhancement**: Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) since surface defects often suffer from low illumination/contrast.
+4. **Albumentations Augmentation & Class Balancing**:
+   - Applies an offline augmentation pipeline exclusively to minority class instances in the training split.
+   - Transformations include spatial modifications (Horizontal Flip, Vertical Flip, Rotation) and pixel enhancements (CLAHE, Random Brightness & Contrast, Hue Saturation Value, Gaussian Blur, Motion Blur).
+   - Dynamically balances all class instances to reach the majority count (~690 instances).
+5. **Statistical Verification & Reports**: Saves class distribution charts and writes quality/preprocessing summaries in `dataset/reports/`.
