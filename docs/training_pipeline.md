@@ -21,20 +21,24 @@ To check raw image annotations visually, use [visualize_annotations.py](file:///
 
 ---
 
-## 🏃 ML Training & Inference Skeletons
+## 🏃 ML Training & Inference Implementation
 
 The core pipeline scripts reside in the `training/` folder:
 
-### 1. Model Training Skeleton
-[train.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/train.py) initializes YOLOv8 model configs and defaults from [configs/experiment.yaml](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/configs/experiment.yaml).
+### 1. Model Training
+[train.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/train.py) implements the YOLOv8 training loop. It parses parameters from [configs/experiment.yaml](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/configs/experiment.yaml), validates configuration settings, and saves checkpoints/logs under `results/`.
 ```bash
-.\venv\Scripts\python.exe training/train.py --epochs 50 --batch_size 16 --device cpu
+# Run training with custom overrides
+.\venv\Scripts\python.exe training/train.py --epochs 100 --batch_size 16 --device cpu
+
+# Run a quick training pipeline check (dry-run mode)
+.\venv\Scripts\python.exe training/train.py --dry-run
 ```
 
 ### 2. Inference / Prediction Skeleton
 [predict.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/predict.py) runs object detection on target image inputs.
 ```bash
-.\venv\Scripts\python.exe training/predict.py --source datasets/raw/NEU-DET/train/images/crazing/crazing_1.jpg --conf 0.4
+.\venv\Scripts\python.exe training/predict.py --source dataset/yolo/images/test/crazing_1.jpg --conf 0.4
 ```
 
 ### 3. Evaluation Skeleton
@@ -49,6 +53,10 @@ The core pipeline scripts reside in the `training/` folder:
 
 Ensure all tests pass prior to pushing changes:
 ```bash
+# Run visualizer and CLI config tests
 .\venv\Scripts\python.exe -m unittest tests/test_visualization.py
 .\venv\Scripts\python.exe -m unittest tests/test_skeletons.py
+
+# Run YOLO training pipeline check in dry-run mode
+.\venv\Scripts\python.exe -m unittest tests/test_train_pipeline.py
 ```
