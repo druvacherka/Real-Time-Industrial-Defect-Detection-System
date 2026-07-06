@@ -85,6 +85,11 @@ def main():
         type=str,
         help="Override YOLOv8 model architecture (e.g. yolov8n, yolov8s)."
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run in dry-run mode (1 epoch, batch size 2, minimal workers)."
+    )
     
     args = parser.parse_args()
     
@@ -102,8 +107,10 @@ def main():
     batch_size = args.batch_size if args.batch_size is not None else config["training"].get("batch_size", 16)
     img_size = args.img_size if args.img_size is not None else config["training"].get("image_size", 640)
     model_arch = args.model if args.model is not None else config["model"].get("architecture", "yolov8n")
+    optimizer = config["training"].get("optimizer", "SGD")
+    workers = config["training"].get("workers", 4)
     
-    # Determine device
+    # 2. Determine device
     device_arg = args.device if args.device is not None else config["hardware"].get("device", "cpu")
     if device_arg == "auto":
         device = get_device()
@@ -117,15 +124,26 @@ def main():
     results_dir.mkdir(exist_ok=True, parents=True)
     logger.info(f"Results output directory resolved: {results_dir}")
     
+    # Dry-run override (1 epoch, batch 2, small size)
+    if args.dry_run:
+        logger.info("Dry-run mode activated: Overriding hyperparameters for quick validation.")
+        epochs = 1
+        batch_size = 2
+        img_size = 64
+        workers = 0
+        optimizer = "Adam"
+        
     # Log hyperparameters
     logger.info("--- Hyperparameters ---")
     logger.info(f"Model Architecture : {model_arch}")
     logger.info(f"Epochs             : {epochs}")
     logger.info(f"Batch Size         : {batch_size}")
     logger.info(f"Image Size         : {img_size}")
+    logger.info(f"Optimizer          : {optimizer}")
+    logger.info(f"Workers            : {workers}")
     logger.info("-----------------------")
     
-    # 2. Initialize YOLOv8 Model
+    # 3. Initialize YOLOv8 Model
     model_name = f"{model_arch}.pt"
     logger.info(f"Initializing YOLO model: {model_name}")
     try:
@@ -136,7 +154,7 @@ def main():
         logger.error(f"Error initializing YOLO model: {e}")
         sys.exit(1)
         
-    # 3. Model Training Data Config Verification
+    # 4. Model Training Data Config Verification
     logger.info("Preparing data configuration mapping...")
     data_yaml_path = ProjectConfig.CONFIG_DIR / "data.yaml"
     
@@ -144,7 +162,30 @@ def main():
         logger.error("Dataset validation failed. Please ensure datasets are preprocessed and configs/data.yaml is present.")
         sys.exit(1)
         
-    # Output parameters dictionary for verification/dry-run tests
+    # 5. Invoke YOLOv8 Model Training Loop
+    logger.info("Starting YOLOv8 training execution...")
+    project_name = config["project"].get("name", "Real-Time Industrial Defect Detection")
+    run_name = f"train_{model_arch}"
+    
+    try:
+        # Run training
+        results = model.train(
+            data=str(data_yaml_path),
+            epochs=epochs,
+            batch=batch_size,
+            imgsz=img_size,
+            device=device,
+            project=str(results_dir),
+            name=run_name,
+            optimizer=optimizer,
+            workers=workers,
+            exist_ok=True
+        )
+        logger.info("YOLOv8 training completed successfully.")
+    except Exception as e:
+        logger.error(f"Error during model training: {e}")
+        sys.exit(1)
+        
     params = {
         "model_arch": model_arch,
         "epochs": epochs,
@@ -152,7 +193,8 @@ def main():
         "img_size": img_size,
         "device": str(device),
         "data_yaml": str(data_yaml_path),
-        "results_dir": str(results_dir)
+        "results_dir": str(results_dir),
+        "run_name": run_name
     }
     return params
 
