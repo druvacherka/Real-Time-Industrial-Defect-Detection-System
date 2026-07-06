@@ -28,6 +28,30 @@ def load_config(config_path: Path) -> dict:
         return yaml.safe_load(f)
 
 
+def validate_dataset_config(data_yaml_path: Path) -> bool:
+    """
+    Validates that the YOLO data configuration file exists and contains the correct class names.
+    """
+    if not data_yaml_path.exists():
+        logger.error(f"Data configuration YAML not found at: {data_yaml_path}")
+        return False
+        
+    try:
+        with open(data_yaml_path, "r") as f:
+            data = yaml.safe_load(f)
+        
+        # Verify names/nc
+        if "names" not in data:
+            logger.error("Missing 'names' key in data.yaml")
+            return False
+            
+        logger.info(f"Successfully validated data config. Number of classes: {len(data['names'])}")
+        return True
+    except Exception as e:
+        logger.error(f"Error parsing data.yaml: {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train YOLOv8 on NEU Metal Surface Defects dataset.")
     parser.add_argument(
@@ -88,6 +112,11 @@ def main():
         
     logger.info(f"Using device: {device}")
     
+    # Setup results output directory
+    results_dir = ProjectConfig.ROOT_DIR / "results"
+    results_dir.mkdir(exist_ok=True, parents=True)
+    logger.info(f"Results output directory resolved: {results_dir}")
+    
     # Log hyperparameters
     logger.info("--- Hyperparameters ---")
     logger.info(f"Model Architecture : {model_arch}")
@@ -107,13 +136,14 @@ def main():
         logger.error(f"Error initializing YOLO model: {e}")
         sys.exit(1)
         
-    # 3. Model Training Skeleton
+    # 3. Model Training Data Config Verification
     logger.info("Preparing data configuration mapping...")
-    data_yaml_path = ProjectConfig.DATASET_DIR / "data.yaml"
+    data_yaml_path = ProjectConfig.CONFIG_DIR / "data.yaml"
     
-    # Note: Training execution will be implemented in Day 4
-    logger.info("Training pipeline skeleton ready. Waiting for processed dataset splits (data.yaml).")
-    
+    if not validate_dataset_config(data_yaml_path):
+        logger.error("Dataset validation failed. Please ensure datasets are preprocessed and configs/data.yaml is present.")
+        sys.exit(1)
+        
     # Output parameters dictionary for verification/dry-run tests
     params = {
         "model_arch": model_arch,
@@ -121,7 +151,8 @@ def main():
         "batch_size": batch_size,
         "img_size": img_size,
         "device": str(device),
-        "data_yaml": str(data_yaml_path)
+        "data_yaml": str(data_yaml_path),
+        "results_dir": str(results_dir)
     }
     return params
 
