@@ -70,10 +70,12 @@ The server will start at **http://localhost:8000**
 
 ## API Endpoints
 
-| Method | Endpoint   | Description                          |
-|--------|------------|--------------------------------------|
-| GET    | `/`        | Welcome message                      |
-| GET    | `/health`  | Service health check                 |
+| Method | Endpoint          | Description                          |
+|--------|-------------------|--------------------------------------|
+| GET    | `/`               | Welcome message                      |
+| GET    | `/health`         | Service health check                 |
+| POST   | `/predict/image`  | Upload image for defect prediction   |
+| POST   | `/predict/video`  | Upload video for defect prediction   |
 
 ### API Documentation (auto-generated)
 
