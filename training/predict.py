@@ -66,30 +66,50 @@ def main():
         
     logger.info(f"Using device: {device}")
     
-    # 2. Initialize Model Skeleton
-    # Note: On Day 3, we mock model initialization if the best.pt weights do not exist yet.
+    # 2. Initialize Model
     logger.info("Initializing prediction model...")
     try:
+        # Check if weights file exists, otherwise fallback to finding it in results/train_yolov8n/weights/best.pt
+        best_pt_fallback = ProjectConfig.ROOT_DIR / "results" / "train_yolov8n" / "weights" / "best.pt"
         if weights_path.exists():
             model = YOLO(str(weights_path))
             logger.info("Custom model loaded successfully.")
+        elif best_pt_fallback.exists():
+            weights_path = best_pt_fallback
+            model = YOLO(str(weights_path))
+            logger.info(f"Custom model loaded from default train run weights: {weights_path}")
         else:
-            logger.warn(f"Trained weights {weights_path} not found. Initializing with default yolov8n.pt.")
-            model = YOLO("yolov8n.pt")
+            logger.warning(f"Trained weights not found at {weights_path} or fallback {best_pt_fallback}. Initializing with default yolov8n.pt.")
+            weights_path = Path("yolov8n.pt")
+            model = YOLO(str(weights_path))
     except Exception as e:
         logger.error(f"Error initializing YOLO model: {e}")
         sys.exit(1)
         
-    # 3. Model Prediction Skeleton
+    # 3. Model Prediction
     logger.info(f"Starting inference with conf threshold {args.conf}...")
-    # results = model.predict(source=str(source_path), conf=args.conf, device=device)
-    logger.info("Prediction pipeline skeleton ready. Waiting for trained model weights.")
+    save_dir = ProjectConfig.ROOT_DIR / "results" / "predictions"
+    try:
+        results = model.predict(
+            source=str(source_path),
+            conf=args.conf,
+            device=device,
+            project=str(ProjectConfig.ROOT_DIR / "results"),
+            name="predictions",
+            save=True,
+            exist_ok=True
+        )
+        logger.info(f"Prediction pipeline completed. Visualized outputs saved to {save_dir}")
+    except Exception as e:
+        logger.error(f"Error during model prediction: {e}")
+        sys.exit(1)
     
     params = {
         "weights": str(weights_path),
         "source": str(source_path),
         "conf": args.conf,
-        "device": str(device)
+        "device": str(device),
+        "save_dir": str(save_dir)
     }
     return params
 
