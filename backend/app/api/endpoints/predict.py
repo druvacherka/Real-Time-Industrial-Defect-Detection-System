@@ -30,7 +30,7 @@ from app.schemas.responses import (
 )
 from app.schemas.requests import LiveStreamRequest
 from app.services.image_service import ImagePreprocessingService, ImageValidationError
-from app.services.inference_service import get_inference_service
+from app.services.model_service import get_model_service
 
 logger = logging.getLogger("defect_detection.predict")
 
@@ -161,8 +161,8 @@ async def predict_image(
 
     # Step 6 — Run inference
     try:
-        inference_svc = get_inference_service()
-        prediction_result = inference_svc.predict_image(processed_image)
+        model_svc = get_model_service()
+        prediction_result = model_svc.predict_image(processed_image)
         logger.info(
             f"[{request_id}] Inference complete: "
             f"{prediction_result.get('detection_count', 0)} detections"
@@ -290,8 +290,8 @@ async def predict_video(
 
     # Step 5 — Run inference
     try:
-        inference_svc = get_inference_service()
-        prediction_result = inference_svc.predict_video(save_path)
+        model_svc = get_model_service()
+        prediction_result = model_svc.predict_video(save_path)
         if prediction_result.get("status") == "error":
             raise ValueError(prediction_result.get("error_message", "Unknown error"))
         logger.info(f"[{request_id}] Video inference complete")
