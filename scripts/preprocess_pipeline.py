@@ -13,10 +13,9 @@ Production pipeline for:
   - Hooks for Albumentations augmentation
 
 Author: saniyamirjanavar-hash
-Date: 2026-07-04
+Date: 2026-07-07  refactor: use shared config module
 """
 
-import os
 import sys
 import time
 import logging
@@ -26,6 +25,19 @@ from collections import defaultdict
 from typing import Tuple, Optional, List, Callable
 
 import numpy as np
+
+# ---------------------------------------------------------------------------
+# Allow running as a standalone script from the project root
+# ---------------------------------------------------------------------------
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from config import (
+    IMAGES_DIR as INPUT_DIR, PROCESSED_DIR as OUTPUT_DIR,
+    REPORTS_DIR, LOGS_DIR, SPLITS, TARGET_SIZE as DEFAULT_TARGET_SIZE,
+    IMAGE_EXTENSIONS as SUPPORTED_EXTENSIONS, ensure_dirs,
+)
 
 try:
     import cv2
@@ -37,31 +49,16 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
+ensure_dirs(LOGS_DIR)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / "preprocess_pipeline.log", mode="a"),
+        logging.FileHandler(LOGS_DIR / "preprocess_pipeline.log", mode="a"),
     ],
 )
 logger = logging.getLogger("preprocess_pipeline")
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATASET_DIR = PROJECT_ROOT / "dataset"
-INPUT_DIR = DATASET_DIR / "yolo" / "images"
-OUTPUT_DIR = DATASET_DIR / "processed"
-REPORTS_DIR = PROJECT_ROOT / "reports"
-
-DEFAULT_TARGET_SIZE = (640, 640)
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
-SPLITS = ["train", "val", "test"]
 
 
 class AugmentationHook:

@@ -10,13 +10,13 @@ Advanced preprocessing with:
   - Duplicate image detection and removal
   - Annotation consistency validation
   - Invalid bounding box detection
+  - Float class ID normalization (0.0 → 0)
   - Comprehensive preprocessing summary
 
 Author: saniyamirjanavar-hash
-Date: 2026-07-05
+Date: 2026-07-07  refactor: use shared config module + float class ID fix
 """
 
-import os
 import sys
 import time
 import hashlib
@@ -28,6 +28,19 @@ from typing import List, Tuple, Optional
 
 import numpy as np
 
+# ---------------------------------------------------------------------------
+# Allow running as a standalone script from the project root
+# ---------------------------------------------------------------------------
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from config import (
+    IMAGES_DIR, LABELS_DIR, REPORTS_DIR, LOGS_DIR, SPLITS,
+    IMAGE_EXTENSIONS as SUPPORTED_EXTENSIONS,
+    NUM_CLASSES, ensure_dirs,
+)
+
 try:
     import cv2
     HAS_OPENCV = True
@@ -37,31 +50,23 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
+ensure_dirs(LOGS_DIR)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / "optimize_preprocess.log", mode="a"),
+        logging.FileHandler(LOGS_DIR / "optimize_preprocess.log", mode="a"),
     ],
 )
 logger = logging.getLogger("optimize_preprocess")
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants (kept for backward-compat; actual values come from config)
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATASET_ROOT = PROJECT_ROOT / "dataset" / "yolo"
-IMAGES_DIR = DATASET_ROOT / "images"
-LABELS_DIR = DATASET_ROOT / "labels"
-REPORTS_DIR = PROJECT_ROOT / "reports"
-
-SPLITS = ["train", "val", "test"]
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
-NUM_CLASSES = 6
+# These are now imported from config.py above.
+# Left as aliases so any code that imports them directly still works.
+from config import IMAGES_DIR, LABELS_DIR, REPORTS_DIR, SPLITS  # re-export
 
 
 class AnnotationValidator:
@@ -70,6 +75,40 @@ class AnnotationValidator:
     def __init__(self, num_classes: int = NUM_CLASSES):
         self.num_classes = num_classes
         self.issues = defaultdict(list)
+
+    @staticmethod
+    def fix_float_class_ids(label_path: Path) -> int:
+        """
+        Rewrite a label file normalising float class IDs to integers.
+
+        e.g.  "0.0 0.5 0.5 0.1 0.1" → "0 0.5 0.5 0.1 0.1"
+
+        Returns the number of lines that were modified.
+        """
+        try:
+            lines = label_path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            return 0
+
+        fixed: list[str] = []
+        modified = 0
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) == 5:
+                try:
+                    cls_id = int(float(parts[0]))
+                    new_line = f"{cls_id} {' '.join(parts[1:])}"
+                    if new_line != line.strip():
+                        modified += 1
+                    fixed.append(new_line)
+                    continue
+                except ValueError:
+                    pass
+            fixed.append(line)
+
+        if modified:
+            label_path.write_text("\n".join(fixed) + "\n", encoding="utf-8")
+        return modified
 
     def validate_label_file(self, label_path: Path, image_path: Optional[Path] = None) -> List[str]:
         """
@@ -393,6 +432,19 @@ class OptimizedPreprocessor:
 
         start = time.time()
 
+        # ---- Step 0: Fix float class IDs across all splits ----
+        logger.info("Fixing float class IDs in label files (0.0 → 0) …")
+        total_fixed_lines = 0
+        for split in SPLITS:
+            lbl_dir = LABELS_DIR / split
+            if not lbl_dir.exists():
+                continue
+            for lbl_path in lbl_dir.glob("*.txt"):
+                total_fixed_lines += AnnotationValidator.fix_float_class_ids(lbl_path)
+        logger.info(f"  Float class ID fix: {total_fixed_lines} lines normalised")
+        self.summary["total_float_ids_fixed"] = total_fixed_lines
+
+        # ---- Step 1-N: per-split preprocessing ----
         for split in SPLITS:
             split_stats = self.process_split(split)
             self.summary["splits"][split] = split_stats
@@ -406,10 +458,11 @@ class OptimizedPreprocessor:
         elapsed = time.time() - start
         logger.info("=" * 60)
         logger.info(f"WORKFLOW COMPLETE in {elapsed:.2f}s")
-        logger.info(f"  Images: {self.summary['total_images']}")
-        logger.info(f"  Duplicates: {self.summary['total_duplicates']}")
-        logger.info(f"  Annotation Issues: {self.summary['total_annotation_issues']}")
-        logger.info(f"  Invalid Bboxes: {self.summary['total_invalid_bboxes']}")
+        logger.info(f"  Images:             {self.summary['total_images']}")
+        logger.info(f"  Float IDs fixed:    {self.summary.get('total_float_ids_fixed', 0)}")
+        logger.info(f"  Duplicates:         {self.summary['total_duplicates']}")
+        logger.info(f"  Annotation Issues:  {self.summary['total_annotation_issues']}")
+        logger.info(f"  Invalid Bboxes:     {self.summary['total_invalid_bboxes']}")
         logger.info("=" * 60)
 
 

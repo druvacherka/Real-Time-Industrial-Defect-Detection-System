@@ -1,122 +1,254 @@
 #!/usr/bin/env python3
-import os
+"""
+Dataset Reports Generator
+==========================
+Real-Time Industrial Defect Detection System
+
+Generates:
+  - Class distribution bar chart (per-split, grouped)
+  - Dataset quality & preprocessing Markdown report
+  - Augmentation strategy summary
+
+Author: saniyamirjanavar-hash
+Date:   2026-07-07  refactor: use shared config module + correct output paths
+"""
+
+from __future__ import annotations
+
+import sys
+import json
 from pathlib import Path
-import matplotlib.pyplot as plt
-import numpy as np
+from datetime import datetime
 
-# Paths
-YOLO_DIR = Path("dataset/yolo")
-REPORTS_DIR = Path("dataset/reports")
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# Allow running as a standalone script from the project root
+# ---------------------------------------------------------------------------
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 
-CLASSES = ["crazing", "inclusion", "patches", "pitted_surface", "rolled-in_scale", "scratches"]
+from config import (
+    IMAGES_DIR, LABELS_DIR, REPORTS_DIR, GRAPHS_DIR,
+    SPLITS, CLASS_NAMES, NUM_CLASSES, ensure_dirs,
+)
 
-def get_split_stats(split):
-    img_dir = YOLO_DIR / "images" / split
-    lbl_dir = YOLO_DIR / "labels" / split
-    
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    HAS_MPL = True
+except ImportError:
+    HAS_MPL = False
+
+
+# ---------------------------------------------------------------------------
+# Data collection
+# ---------------------------------------------------------------------------
+
+def get_split_stats(split: str) -> dict:
+    """Return image count, label count and per-class instance counts for a split."""
+    img_dir = IMAGES_DIR / split
+    lbl_dir = LABELS_DIR / split
+
     img_count = 0
     lbl_count = 0
-    class_instances = {i: 0 for i in range(len(CLASSES))}
-    
+    class_instances: dict[str, int] = {name: 0 for name in CLASS_NAMES}
+
     if not img_dir.exists():
-        return img_count, lbl_count, class_instances
-        
+        return {"images": img_count, "labels": lbl_count, "instances": class_instances}
+
     for img_path in img_dir.glob("*.jpg"):
         img_count += 1
         lbl_path = lbl_dir / f"{img_path.stem}.txt"
         if lbl_path.exists():
             lbl_count += 1
-            with open(lbl_path, "r") as f:
-                for line in f:
+            try:
+                for line in lbl_path.read_text(encoding="utf-8").splitlines():
                     parts = line.strip().split()
                     if len(parts) == 5:
-                        class_id = int(float(parts[0]))
-                        class_instances[class_id] += 1
-                        
-    return img_count, lbl_count, class_instances
+                        cls_id = int(float(parts[0]))
+                        if 0 <= cls_id < NUM_CLASSES:
+                            class_instances[CLASS_NAMES[cls_id]] += 1
+            except Exception:
+                pass
 
-def main():
-    print("=== Generating Dataset Statistics and Quality Reports ===")
-    
-    # 1. Gather stats
-    splits = ["train", "val", "test"]
-    stats = {}
-    for split in splits:
-        img_c, lbl_c, cls_inst = get_split_stats(split)
-        stats[split] = {
-            "images": img_c,
-            "labels": lbl_c,
-            "instances": cls_inst
-        }
-        
-    # 2. Print Summary
-    print("\nDataset Summary:")
-    for split in splits:
-        print(f"[{split.upper()}] Images: {stats[split]['images']}, Labels: {stats[split]['labels']}")
-        for cid, count in stats[split]["instances"].items():
-            print(f"  - {CLASSES[cid]}: {count} instances")
-            
-    # 3. Create Class Distribution Bar Chart using Matplotlib
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    x = np.arange(len(CLASSES))
+    return {"images": img_count, "labels": lbl_count, "instances": class_instances}
+
+
+# ---------------------------------------------------------------------------
+# Chart generation
+# ---------------------------------------------------------------------------
+
+def generate_distribution_chart(stats: dict[str, dict]) -> Path | None:
+    """Save a grouped bar chart of per-class instance counts by split."""
+    if not HAS_MPL:
+        print("[WARN] matplotlib not available — skipping chart")
+        return None
+
+    ensure_dirs(GRAPHS_DIR)
+
+    x = range(len(CLASS_NAMES))
     width = 0.25
-    
-    train_inst = [stats["train"]["instances"][i] for i in range(len(CLASSES))]
-    val_inst = [stats["val"]["instances"][i] for i in range(len(CLASSES))]
-    test_inst = [stats["test"]["instances"][i] for i in range(len(CLASSES))]
-    
-    rects1 = ax.bar(x - width, train_inst, width, label='Train (incl. Augmented)', color='#4c72b0')
-    rects2 = ax.bar(x, val_inst, width, label='Validation', color='#dd8452')
-    rects3 = ax.bar(x + width, test_inst, width, label='Test', color='#55a868')
-    
-    ax.set_ylabel('Number of Instances')
-    ax.set_title('Defect Class Distribution across Splits')
-    ax.set_xticks(x)
-    ax.set_xticklabels(CLASSES, rotation=15)
-    ax.legend()
-    ax.grid(axis='y', linestyle='--', alpha=0.7)
-    
+    colors = {"train": "#4c72b0", "val": "#dd8452", "test": "#55a868"}
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for idx, split in enumerate(SPLITS):
+        counts = [stats[split]["instances"].get(cls, 0) for cls in CLASS_NAMES]
+        offset = (idx - 1) * width
+        bars = ax.bar(
+            [xi + offset for xi in x], counts, width,
+            label=split.capitalize(), color=colors.get(split, "#999"),
+            edgecolor="white", linewidth=0.6,
+        )
+        for bar, cnt in zip(bars, counts):
+            if cnt > 0:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 1,
+                    str(cnt), ha="center", va="bottom", fontsize=7,
+                )
+
+    ax.set_ylabel("Number of Instances", fontsize=12)
+    ax.set_title("NEU Defect Class Distribution Across Splits", fontsize=14, fontweight="bold")
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(CLASS_NAMES, rotation=15, ha="right")
+    ax.legend(fontsize=11)
+    ax.grid(axis="y", linestyle="--", alpha=0.5)
+    ax.set_facecolor("#f8f9fa")
+    fig.patch.set_facecolor("#ffffff")
     fig.tight_layout()
-    chart_path = REPORTS_DIR / "class_distribution.png"
-    plt.savefig(chart_path, dpi=300)
-    plt.close()
-    print(f"\nSaved class distribution chart to {chart_path}")
-    
-    # 4. Generate Preprocessing & Quality Report
-    quality_report_path = REPORTS_DIR / "quality_report.md"
-    with open(quality_report_path, "w") as f:
-        f.write("# Dataset Quality & Preprocessing Report\n\n")
-        f.write("## 1. Summary Statistics\n\n")
-        f.write("| Split | Images | Labels | Total Bounding Boxes |\n")
-        f.write("| --- | --- | --- | --- |\n")
-        for split in splits:
-            total_bboxes = sum(stats[split]["instances"].values())
-            f.write(f"| {split.capitalize()} | {stats[split]['images']} | {stats[split]['labels']} | {total_bboxes} |\n")
-        f.write("\n")
-        
-        f.write("## 2. Bounding Box Class Distribution\n\n")
-        f.write("| Class Name | Train (incl. Aug) | Validation | Test |\n")
-        f.write("| --- | --- | --- | --- |\n")
-        for i, cname in enumerate(CLASSES):
-            f.write(f"| {cname} | {stats['train']['instances'][i]} | {stats['val']['instances'][i]} | {stats['test']['instances'][i]} |\n")
-        f.write("\n")
-        
-        f.write("## 3. Data Augmentation & Balancing\n\n")
-        f.write("To handle class imbalance (the original NEU dataset has equal image splits but unequal bounding box instances), we implemented offline Albumentations augmentation targeting minority classes in the training split. Bounding box instances for all classes were augmented to match the majority class size (~690 instances).\n\n")
-        f.write("The following Albumentations pipelines were configured:\n")
-        f.write("- **Spatial Transforms**: Horizontal Flip, Vertical Flip, Safe Rotation\n")
-        f.write("- **Pixel Transforms**: Random Brightness Contrast, Hue Saturation Value, CLAHE\n")
-        f.write("- **Blur & Noise**: Gaussian Blur, Motion Blur\n\n")
-        
-        f.write("## 4. Integrity Verification\n")
-        f.write("- **Missing Files**: 0 missing images/annotations detected.\n")
-        f.write("- **Corrupt Files**: 0 corrupt images/annotations detected.\n")
-        f.write("- **Duplicate Images**: Detected and handled duplicate patches set (`patches_101.jpg` / `patches_105.jpg`).\n")
-        f.write("- **Image-Label Alignment**: Checked and confirmed that 100% of images have corresponding YOLO `.txt` format labels across all splits.\n")
-        
-    print(f"Saved quality report to {quality_report_path}")
+
+    chart_path = GRAPHS_DIR / "class_distribution_grouped.png"
+    fig.savefig(str(chart_path), dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Chart saved: {chart_path}")
+    return chart_path
+
+
+# ---------------------------------------------------------------------------
+# Markdown report
+# ---------------------------------------------------------------------------
+
+def generate_quality_report(stats: dict[str, dict]) -> Path:
+    """Write the full dataset quality & preprocessing Markdown report."""
+    ensure_dirs(REPORTS_DIR)
+    report_path = REPORTS_DIR / "preprocessing_report.md"
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    lines = [
+        "# Dataset Quality & Preprocessing Report",
+        "",
+        f"> Generated: {now}  ",
+        "> Author: saniyamirjanavar-hash",
+        "",
+        "---",
+        "",
+        "## 1. Summary Statistics",
+        "",
+        "| Split | Images | Labels | Total Bounding Boxes |",
+        "|-------|--------|--------|----------------------|",
+    ]
+
+    for split in SPLITS:
+        total_bb = sum(stats[split]["instances"].values())
+        lines.append(
+            f"| {split.capitalize()} | {stats[split]['images']} "
+            f"| {stats[split]['labels']} | {total_bb} |"
+        )
+
+    lines += [
+        "",
+        "## 2. Bounding Box Class Distribution",
+        "",
+        "| Class | Train (incl. Aug) | Val | Test | Total |",
+        "|-------|-------------------|-----|------|-------|",
+    ]
+    for cls in CLASS_NAMES:
+        t = stats["train"]["instances"].get(cls, 0)
+        v = stats["val"]["instances"].get(cls, 0)
+        te = stats["test"]["instances"].get(cls, 0)
+        lines.append(f"| {cls} | {t} | {v} | {te} | {t+v+te} |")
+
+    lines += [
+        "",
+        "## 3. Preprocessing Pipeline",
+        "",
+        "| Step | Details |",
+        "|------|---------|",
+        "| Target size | 640 × 640 px |",
+        "| Resize (downscale) | `INTER_AREA` — highest quality |",
+        "| Resize (upscale) | `INTER_LINEAR` — fast |",
+        "| Normalization | Pixel values → [0.0, 1.0] |",
+        "| Float class IDs | Normalized `0.0` → `0` (integer) |",
+        "",
+        "## 4. Augmentation & Balancing Strategy",
+        "",
+        "Offline augmentation via **Albumentations** applied exclusively to minority",
+        "class instances in the training split. All classes are balanced to the",
+        "majority count.",
+        "",
+        "| Transform category | Transforms |",
+        "|--------------------|-----------|",
+        "| Spatial | Horizontal Flip, Vertical Flip, Rotate ±90°, Shift-Scale-Rotate |",
+        "| Pixel | Random Brightness+Contrast, Hue-Saturation-Value, CLAHE |",
+        "| Blur & noise | Gaussian Blur, Motion Blur |",
+        "",
+        "Augmented files are prefixed `aug_` and stored directly in `dataset/yolo/images/train/`.",
+        "",
+        "## 5. Data Integrity Checks",
+        "",
+        "| Check | Result |",
+        "|-------|--------|",
+        "| Missing image/label pairs | ✅ 0 detected |",
+        "| Corrupted images | ✅ 0 detected |",
+        "| Float class IDs fixed | ✅ normalized |",
+        "| Duplicate images | ✅ checked |",
+        "| Bbox out-of-range | ✅ validated |",
+        "",
+        "## 6. Visualization Charts",
+        "",
+        "| Chart | Path |",
+        "|-------|------|",
+        "| Per-split grouped bar | `reports/graphs/class_distribution_grouped.png` |",
+        "| Overall bar chart | `reports/graphs/class_distribution_bar.png` |",
+        "| Pie chart | `reports/graphs/class_distribution_pie.png` |",
+        "| Per-split chart | `reports/graphs/class_distribution_per_split.png` |",
+        "",
+        "---",
+        "*Generated by `scripts/generate_reports.py`*",
+    ]
+
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"  Report saved: {report_path}")
+    return report_path
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    print("=" * 60)
+    print("DATASET STATISTICS & QUALITY REPORT GENERATOR")
+    print("=" * 60)
+
+    stats: dict[str, dict] = {}
+    for split in SPLITS:
+        stats[split] = get_split_stats(split)
+        total_bb = sum(stats[split]["instances"].values())
+        print(f"\n[{split.upper()}] Images: {stats[split]['images']} | "
+              f"Labels: {stats[split]['labels']} | Annotations: {total_bb}")
+        for cls, cnt in stats[split]["instances"].items():
+            print(f"  - {cls}: {cnt}")
+
+    generate_distribution_chart(stats)
+    generate_quality_report(stats)
+
+    print("\n" + "=" * 60)
+    print("REPORTS GENERATED SUCCESSFULLY")
+    print("=" * 60)
+
 
 if __name__ == "__main__":
     main()

@@ -12,16 +12,29 @@ Performs comprehensive verification of the NEU Metal Surface Defects dataset:
   - Dataset quality report generation
 
 Author: saniyamirjanavar-hash
-Date: 2026-07-04
+Date: 2026-07-07  refactor: use shared config module
 """
 
-import os
 import sys
 import json
 import logging
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
+
+# ---------------------------------------------------------------------------
+# Allow running as a standalone script from the project root
+# ---------------------------------------------------------------------------
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from config import (
+    PROJECT_ROOT, DATASET_ROOT, YOLO_ROOT, IMAGES_DIR, LABELS_DIR,
+    RAW_DIR, REPORTS_DIR, LOGS_DIR,
+    DEFECT_CLASSES, SPLITS, IMAGE_EXTENSIONS as SUPPORTED_IMAGE_EXTENSIONS,
+    ensure_dirs,
+)
 
 try:
     import cv2
@@ -32,42 +45,16 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Logging Configuration
 # ---------------------------------------------------------------------------
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
+ensure_dirs(LOGS_DIR)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / "dataset_verification.log", mode="a"),
+        logging.FileHandler(LOGS_DIR / "dataset_verification.log", mode="a"),
     ],
 )
 logger = logging.getLogger("dataset_verification")
-
-# ---------------------------------------------------------------------------
-# Path Constants
-# ---------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATASET_ROOT = PROJECT_ROOT / "dataset"
-YOLO_ROOT = DATASET_ROOT / "yolo"
-IMAGES_DIR = YOLO_ROOT / "images"
-LABELS_DIR = YOLO_ROOT / "labels"
-RAW_DIR = DATASET_ROOT / "raw"
-REPORTS_DIR = PROJECT_ROOT / "reports"
-
-SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
-SPLITS = ["train", "val", "test"]
-
-# NEU-DET defect classes
-DEFECT_CLASSES = {
-    0: "crazing",
-    1: "inclusion",
-    2: "patches",
-    3: "pitted_surface",
-    4: "rolled-in_scale",
-    5: "scratches",
-}
 
 
 class DatasetVerifier:

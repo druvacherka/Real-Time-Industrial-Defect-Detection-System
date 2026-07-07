@@ -8,7 +8,7 @@ Analyzes the distribution of all six NEU defect classes, generates
 statistics, creates Matplotlib visualizations, and exports reports.
 
 Author: saniyamirjanavar-hash
-Date: 2026-07-05
+Date: 2026-07-07  refactor: use shared config module + enhanced charts
 """
 
 import sys
@@ -19,6 +19,18 @@ from collections import defaultdict
 from datetime import datetime
 
 import numpy as np
+
+# ---------------------------------------------------------------------------
+# Allow running as a standalone script from the project root
+# ---------------------------------------------------------------------------
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from config import (
+    IMAGES_DIR, LABELS_DIR, REPORTS_DIR, GRAPHS_DIR, LOGS_DIR,
+    SPLITS, DEFECT_CLASSES, CLASS_COLORS, ensure_dirs,
+)
 
 try:
     import matplotlib
@@ -31,48 +43,19 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
+ensure_dirs(LOGS_DIR)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOG_DIR / "class_distribution.log", mode="a"),
+        logging.FileHandler(LOGS_DIR / "class_distribution.log", mode="a"),
     ],
 )
 logger = logging.getLogger("class_distribution")
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATASET_ROOT = PROJECT_ROOT / "dataset" / "yolo"
-IMAGES_DIR = DATASET_ROOT / "images"
-LABELS_DIR = DATASET_ROOT / "labels"
-REPORTS_DIR = PROJECT_ROOT / "reports"
-GRAPHS_DIR = REPORTS_DIR / "graphs"
-
-SPLITS = ["train", "val", "test"]
-DEFECT_CLASSES = {
-    0: "crazing",
-    1: "inclusion",
-    2: "patches",
-    3: "pitted_surface",
-    4: "rolled-in_scale",
-    5: "scratches",
-}
-
-# Color palette for charts (one per class)
-CLASS_COLORS = [
-    "#FF6B6B",  # crazing — coral red
-    "#4ECDC4",  # inclusion — teal
-    "#45B7D1",  # patches — sky blue
-    "#96CEB4",  # pitted_surface — sage green
-    "#FFEAA7",  # rolled-in_scale — yellow
-    "#DDA0DD",  # scratches — plum
-]
+# Constants are now imported from config.py above.
+# CLASS_COLORS is already imported from config.
 
 
 class ClassDistributionAnalyzer:

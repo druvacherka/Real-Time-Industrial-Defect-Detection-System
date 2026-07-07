@@ -1,18 +1,52 @@
-# Augmentation Settings for Albumentations Pipeline
-augmentations:
+# Augmentation Configuration — NEU Metal Surface Defects
+# Used by scripts/augment_dataset.py and scripts/build_final_dataset.py
+# Date: 2026-07-07
+
+# Random seed for reproducibility
+seed: 42
+
+# Target: balance all classes to reach this instance count in train split.
+# Set to 0 to auto-detect (= majority class count).
+target_count: 0
+
+# Minimum bounding box visibility after spatial transforms (0–1)
+min_visibility: 0.3
+
+# Spatial transforms
+spatial:
   horizontal_flip:
     p: 0.5
   vertical_flip:
     p: 0.5
-  random_brightness_contrast:
-    brightness_limit: 0.2
-    contrast_limit: 0.2
+  rotate:
+    limit: 90
     p: 0.5
   shift_scale_rotate:
     shift_limit: 0.0625
-    scale_limit: 0.1
+    scale_limit: 0.10
     rotate_limit: 45
+    p: 0.4
+
+# Pixel / colour transforms
+pixel:
+  random_brightness_contrast:
+    brightness_limit: 0.25
+    contrast_limit: 0.25
     p: 0.5
-  blur:
-    blur_limit: 3
-    p: 0.2
+  hue_saturation_value:
+    hue_shift_limit: 15
+    sat_shift_limit: 30
+    val_shift_limit: 20
+    p: 0.4
+  clahe:
+    clip_limit: 4.0
+    p: 0.4
+
+# Blur & noise transforms
+blur:
+  gaussian_blur:
+    blur_limit: [3, 7]
+    p: 0.3
+  motion_blur:
+    blur_limit: 5
+    p: 0.25
