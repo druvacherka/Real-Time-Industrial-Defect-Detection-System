@@ -29,4 +29,8 @@ async def root():
     whether the server is up and responding to requests.
     """
     logger.info("Root endpoint hit")
-    return RootResponse(message="Industrial Defect Detection API")
+    return RootResponse(
+        project="Real-Time Industrial Defect Detection System",
+        description="FastAPI backend for YOLOv8-based industrial surface defect detection",
+        docs_url="/docs"
+    )
