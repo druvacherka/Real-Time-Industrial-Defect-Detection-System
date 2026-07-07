@@ -76,6 +76,7 @@ The server will start at **http://localhost:8000**
 | GET    | `/health`         | Service health check                 |
 | POST   | `/predict/image`  | Upload image for defect prediction   |
 | POST   | `/predict/video`  | Upload video for defect prediction   |
+| POST   | `/predict/live`   | Connect live RTSP/RTMP stream for detection |
 
 ### API Documentation (auto-generated)
 
