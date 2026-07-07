@@ -29,7 +29,7 @@ def main():
     parser.add_argument(
         "--data",
         type=str,
-        default=str(ProjectConfig.DATASET_DIR / "data.yaml"),
+        default=str(ProjectConfig.CONFIG_DIR / "data.yaml"),
         help="Path to dataset configuration YAML."
     )
     parser.add_argument(
@@ -64,29 +64,50 @@ def main():
         
     logger.info(f"Using device: {device}")
     
-    # 2. Initialize Model Skeleton
+    # 2. Initialize Model
     logger.info("Initializing model for evaluation...")
     try:
+        best_pt_fallback = ProjectConfig.ROOT_DIR / "results" / "train_yolov8n" / "weights" / "best.pt"
         if weights_path.exists():
             model = YOLO(str(weights_path))
             logger.info("Custom model loaded successfully.")
+        elif best_pt_fallback.exists():
+            weights_path = best_pt_fallback
+            model = YOLO(str(weights_path))
+            logger.info(f"Custom model loaded from default train run weights: {weights_path}")
         else:
-            logger.warn(f"Trained weights {weights_path} not found. Loading baseline model yolov8n.pt for metrics check.")
-            model = YOLO("yolov8n.pt")
+            logger.warning(f"Trained weights not found at {weights_path} or fallback {best_pt_fallback}. Loading baseline model yolov8n.pt for metrics check.")
+            weights_path = Path("yolov8n.pt")
+            model = YOLO(str(weights_path))
     except Exception as e:
         logger.error(f"Error loading model: {e}")
         sys.exit(1)
         
-    # 3. Model Validation / Metrics Skeleton
+    # 3. Model Validation / Metrics
     logger.info("Starting model evaluation run...")
-    # metrics = model.val(data=str(data_yaml_path), split=args.split, device=device)
-    logger.info("Evaluation pipeline skeleton ready. Waiting for custom trained model.")
-    
+    try:
+        metrics = model.val(
+            data=str(data_yaml_path),
+            split=args.split,
+            device=device,
+            project=str(ProjectConfig.ROOT_DIR / "results"),
+            name=f"evaluate_{args.split}",
+            exist_ok=True
+        )
+        map50 = metrics.box.map50
+        map95 = metrics.box.map
+        logger.info(f"Evaluation completed. Metrics: mAP50={map50:.4f}, mAP50-95={map95:.4f}")
+    except Exception as e:
+        logger.error(f"Error during model evaluation: {e}")
+        sys.exit(1)
+        
     params = {
         "weights": str(weights_path),
         "data": str(data_yaml_path),
         "split": args.split,
-        "device": str(device)
+        "device": str(device),
+        "map50": map50,
+        "map95": map95
     }
     return params
 
