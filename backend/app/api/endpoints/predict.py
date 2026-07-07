@@ -25,7 +25,10 @@ from app.schemas.responses import (
     UploadVideoResponse,
     VideoPredictionDetails,
     FrameDetectionSummary,
+    UploadLiveResponse,
+    LiveStreamPredictionDetails,
 )
+from app.schemas.requests import LiveStreamRequest
 from app.services.image_service import ImagePreprocessingService, ImageValidationError
 from app.services.inference_service import get_inference_service
 
@@ -339,3 +342,70 @@ async def predict_video(
         processing_time_ms=round(processing_time * 1000, 1),
         prediction=prediction_details,
     )
+
+
+@router.post(
+    "/live",
+    response_model=UploadLiveResponse,
+    summary="Initiate live stream defect prediction",
+    description=(
+        "Start a defect detection session on a live RTSP/RTMP stream or webcam. "
+        "The stream is validated and initialized using OpenCV VideoCapture."
+    ),
+    responses={
+        400: {"description": "Invalid stream URL or connection failure"},
+        500: {"description": "Internal server error"},
+    },
+)
+async def predict_live(
+    request_data: LiveStreamRequest,
+    request: Request,
+):
+    request_id = _generate_request_id()
+    logger.info(
+        f"[{request_id}] Live stream connection requested for: {request_data.source}"
+    )
+
+    source = request_data.source
+    # Convert source to integer if it is a digit (e.g. webcam '0')
+    if source.isdigit():
+        source = int(source)
+
+    try:
+        # Validate stream connection using OpenCV VideoCapture
+        import cv2
+        cap = cv2.VideoCapture(source)
+        if not cap.isOpened():
+            raise ValueError(f"Could not open live stream source: {request_data.source}")
+        
+        # Read resolution and FPS
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        # Build response details
+        prediction_details = LiveStreamPredictionDetails(
+            status="connected",
+            source=str(request_data.source),
+            fps=round(fps, 2) if fps > 0 else 30.0,
+            video_resolution=[width, height] if (width > 0 and height > 0) else [1280, 720],
+            model="yolov8n_defects",
+        )
+
+        logger.info(
+            f"[{request_id}] Live stream connection successful: resolution={width}x{height}, fps={fps}"
+        )
+
+        return UploadLiveResponse(
+            request_id=request_id,
+            status="success",
+            message="Live stream connection established successfully",
+            prediction=prediction_details,
+        )
+    except Exception as exc:
+        logger.error(f"[{request_id}] Live stream connection failed: {exc}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Live stream connection failed: {str(exc)}",
+        )

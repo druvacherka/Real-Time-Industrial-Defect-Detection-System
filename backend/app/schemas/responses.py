@@ -111,3 +111,20 @@ class UploadVideoResponse(BaseModel):
     file_size_mb: float = Field(default=0.0, example=4.52)
     processing_time_ms: float = Field(default=0.0, example=1250.5)
     prediction: Optional[VideoPredictionDetails] = None
+
+
+class LiveStreamPredictionDetails(BaseModel):
+    """Metadata response for active live stream defect detection."""
+    status: str = Field(..., example="connected")
+    source: str = Field(..., example="rtsp://127.0.0.1:8554/live")
+    fps: float = Field(default=0.0, example=30.0)
+    video_resolution: List[int] = Field(default_factory=lambda: [1280, 720])
+    model: str = Field(default="yolov8n_defects")
+
+
+class UploadLiveResponse(BaseModel):
+    """Response for the live prediction endpoint."""
+    request_id: str = Field(..., example="c3d4e5f6g7h8")
+    status: str = Field(..., example="success")
+    message: str = Field(..., example="Live stream connection established successfully")
+    prediction: Optional[LiveStreamPredictionDetails] = None
