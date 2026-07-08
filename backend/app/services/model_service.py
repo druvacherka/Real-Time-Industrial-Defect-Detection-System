@@ -73,7 +73,8 @@ class ModelService:
 
     def predict_video(self, video_path: Path) -> Dict[str, Any]:
         """
-        Run inference on video file.
+        Run inference on video file frame-by-frame using OpenCV.
+        Accumulates detection results across frames.
         """
         if not self.model_wrapper:
             logger.error("ModelService: predict_video failed (model not loaded)")
@@ -90,23 +91,64 @@ class ModelService:
             frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            cap.release()
 
             duration = frame_count / fps if fps > 0 else 0.0
+            
+            total_detections = 0
+            class_counts = {}
 
-            # Simulate prediction summary
+            # Process every Nth frame to speed up inference if video is long (e.g. sample every 5th frame)
+            # For short/precise videos, we can process all frames. Let's process every 5th frame.
+            frame_idx = 0
+            processed_frames = 0
+            sample_rate = 5
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                if frame_idx % sample_rate == 0:
+                    # Convert BGR to RGB (matching preprocessor output expected by model)
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    # Resize to target input size
+                    frame_resized = cv2.resize(frame_rgb, (640, 640), interpolation=cv2.INTER_LINEAR)
+                    
+                    # Run inference on frame
+                    prediction = self.model_wrapper.predict(frame_resized)
+                    for det in prediction.detections:
+                        total_detections += 1
+                        class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
+                    processed_frames += 1
+
+                frame_idx += 1
+
+            cap.release()
+
+            # Format detection summary
+            from app.models.model_loader import DEFECT_CLASSES
+            name_to_id = {v: k for k, v in DEFECT_CLASSES.items()}
             detections_summary = [
-                {"class": "scratches", "class_id": 5, "count": 5},
-                {"class": "inclusion", "class_id": 1, "count": 2},
+                {
+                    "class": name,
+                    "class_id": name_to_id.get(name, -1),
+                    "count": count
+                }
+                for name, count in class_counts.items()
             ]
 
             processing_time = time.time() - start_time
+            logger.info(
+                f"Video inference completed: processed {processed_frames}/{frame_count} frames, "
+                f"detected {total_detections} total defects in {processing_time:.2f} s"
+            )
+
             return {
                 "detection_summary": detections_summary,
-                "total_detections": 7,
-                "processing_time": f"{processing_time * 1000:.1f} ms",
+                "total_detections": total_detections,
+                "processing_time": f"{processing_time:.2f} s",
                 "frame_count": frame_count,
-                "fps": round(fps, 2),
+                "fps": round(fps, 2) if fps > 0 else 30.0,
                 "video_duration_seconds": round(duration, 2),
                 "video_resolution": [width, height],
                 "model": self.model_wrapper.model_name,
@@ -120,13 +162,13 @@ class ModelService:
         """
         Unload the YOLO model from memory and trigger garbage collection.
         """
-        logger.info("ModelService: unloading model and freeing memory...")
+        logger.info("ModelService: initiating model unloading sequence...")
         if self.model_wrapper:
             self.model_wrapper.model = None
             self.model_wrapper.is_loaded = False
         self.model_wrapper = None
         gc.collect()
-        logger.info("ModelService: memory freed successfully")
+        logger.info("ModelService: memory freed successfully post-unload")
 
 
 # Global model service singleton
@@ -134,8 +176,9 @@ _model_service_instance: Optional[ModelService] = None
 
 
 def get_model_service() -> ModelService:
-    """Retrieve or initialize the global model service."""
+    """Retrieve or initialize the global model service with tracking logs."""
     global _model_service_instance
     if _model_service_instance is None:
+        logger.info("ModelService: Instantiating global singleton instance")
         _model_service_instance = ModelService()
     return _model_service_instance
