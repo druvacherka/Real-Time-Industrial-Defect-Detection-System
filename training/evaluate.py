@@ -14,6 +14,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from utils.config import ProjectConfig
 from utils.device import get_device
 from utils.logger import get_logger
+from utils.metrics import generate_markdown_report
 
 logger = get_logger("evaluation")
 
@@ -97,6 +98,36 @@ def main():
         map50 = metrics.box.map50
         map95 = metrics.box.map
         logger.info(f"Evaluation completed. Metrics: mAP50={map50:.4f}, mAP50-95={map95:.4f}")
+        
+        # Compile metrics and generate markdown report
+        try:
+            names = model.names
+            metrics_dict = {
+                "overall": {
+                    "precision": float(metrics.box.mp),
+                    "recall": float(metrics.box.mr),
+                    "map50": float(map50),
+                    "map95": float(map95)
+                },
+                "classes": {}
+            }
+            # Extract class-wise metrics
+            for i, class_name in names.items():
+                # class_result returns (precision, recall, map50, map95)
+                res = metrics.box.class_result(i)
+                metrics_dict["classes"][i] = {
+                    "name": class_name,
+                    "precision": float(res[0]),
+                    "recall": float(res[1]),
+                    "map50": float(res[2]),
+                    "map95": float(res[3])
+                }
+            
+            report_path = ProjectConfig.ROOT_DIR / "results" / f"evaluation_report_{args.split}.md"
+            generate_markdown_report(metrics_dict, report_path)
+            logger.info(f"Automatically generated and saved markdown report to {report_path}")
+        except Exception as report_err:
+            logger.warning(f"Could not generate evaluation markdown report: {report_err}")
     except Exception as e:
         logger.error(f"Error during model evaluation: {e}")
         sys.exit(1)

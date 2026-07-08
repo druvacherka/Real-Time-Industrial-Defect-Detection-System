@@ -15,6 +15,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from utils.config import ProjectConfig
 from utils.device import get_device, print_device_info
 from utils.logger import get_logger
+from utils.metrics import plot_learning_curves
 
 logger = get_logger("training")
 
@@ -182,6 +183,14 @@ def main():
             exist_ok=True
         )
         logger.info("YOLOv8 training completed successfully.")
+        
+        # Generate learning curves automatically from results.csv
+        try:
+            results_csv = results_dir / run_name / "results.csv"
+            plot_learning_curves(results_csv, results_dir / run_name)
+            logger.info("Automatically generated and saved training loss/mAP plots.")
+        except Exception as plot_err:
+            logger.warning(f"Could not generate training learning curves plots: {plot_err}")
     except Exception as e:
         logger.error(f"Error during model training: {e}")
         sys.exit(1)
