@@ -1,8 +1,35 @@
-# NEU Metal Surface Defects Classes
+# ============================================================
+# NEU Metal Surface Defects — Class Taxonomy
+# ============================================================
+# Used by:
+#   - scripts/validate_annotations.py
+#   - scripts/verify_dataset.py
+#   - configs/data.yaml
+# Author:  saniyamirjanavar-hash
+# Date:    2026-07-08  docs(data): generate dataset statistics and
+#                      preprocessing reports
+#
+# Class IDs must exactly match the integer labels in YOLO .txt files
+# and the 'names' mapping in data.yaml.
+# ============================================================
+
+# Primary key used by YOLO training (Ultralytics convention)
+names:
+  - crazing           # 0 — network of fine surface cracks
+  - inclusion         # 1 — embedded non-metallic particles
+  - patches           # 2 — irregular surface discolouration
+  - pitted_surface    # 3 — small surface pits/holes
+  - rolled-in_scale   # 4 — rolled metal scale inclusions
+  - scratches         # 5 — linear surface scratch defects
+
+# Human-readable alias (kept for backward compatibility with older scripts)
 classes:
   - crazing
   - inclusion
   - patches
   - pitted_surface
-  - rolled_in_scale
+  - rolled-in_scale
   - scratches
+
+# Number of classes (convenience field)
+nc: 6
