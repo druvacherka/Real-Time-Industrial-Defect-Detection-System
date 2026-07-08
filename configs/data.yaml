@@ -1,7 +1,7 @@
 # YOLOv8 Dataset Configuration — NEU Metal Surface Defects
 # Updated: 2026-07-07  fix: class name rolled_in_scale -> rolled-in_scale
 
-path: ../dataset/yolo  # dataset root dir (relative to training execution path)
+path: C:\Users\druva\projects\Real-Time-Industrial-Defect-Detection-System\dataset\yolo  # dataset root dir (relative to training execution path)
 train: images/train    # train images (relative to path)
 val:   images/val      # val images   (relative to path)
 test:  images/test     # test images  (relative to path, optional)
