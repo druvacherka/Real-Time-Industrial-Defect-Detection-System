@@ -15,6 +15,9 @@ class HealthResponse(BaseModel):
     """Health check response."""
     status: str = Field(..., example="healthy")
     version: str = Field(..., example="0.1.0")
+    service: str = Field(default="Industrial Defect Detection", example="Industrial Defect Detection")
+    cpu_percent: float = Field(default=0.0, example=12.5)
+    memory_percent: float = Field(default=0.0, example=45.2)
 
 
 class RootResponse(BaseModel):
