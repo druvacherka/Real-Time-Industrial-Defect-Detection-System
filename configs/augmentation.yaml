@@ -1,52 +1,98 @@
+# ============================================================
 # Augmentation Configuration — NEU Metal Surface Defects
-# Used by scripts/augment_dataset.py and scripts/build_final_dataset.py
-# Date: 2026-07-07
+# ============================================================
+# Used by: scripts/augment_dataset.py
+# Author:  saniyamirjanavar-hash
+# Date:    2026-07-08  feat(data): optimize augmentation pipeline
+#                      and dataset balancing
+# ============================================================
 
-# Random seed for reproducibility
+# ── Reproducibility ────────────────────────────────────────
 seed: 42
 
-# Target: balance all classes to reach this instance count in train split.
-# Set to 0 to auto-detect (= majority class count).
+# ── Balancing Strategy ─────────────────────────────────────
+# Set target_count: 0  → auto-detect (equals the majority class count)
+# Set target_count: N  → augment every minority class up to N instances
 target_count: 0
 
-# Minimum bounding box visibility after spatial transforms (0–1)
+# Maximum augmented images to generate per source image in a single pass.
+# Limits infinite loops on very small minority classes.
+max_aug_per_source: 8
+
+# ── Bounding-Box Safety ────────────────────────────────────
+# Drop augmented samples where the visible bbox area falls below this
+# fraction after spatial transforms.  Range: 0.0 – 1.0
 min_visibility: 0.3
 
-# Spatial transforms
+# ── Spatial Transforms ─────────────────────────────────────
 spatial:
   horizontal_flip:
     p: 0.5
+
   vertical_flip:
     p: 0.5
+
   rotate:
+    # Random rotation angle sampled uniformly in [-limit, +limit] degrees
     limit: 90
+    border_mode: 0          # cv2.BORDER_CONSTANT (black padding)
     p: 0.5
+
   shift_scale_rotate:
-    shift_limit: 0.0625
-    scale_limit: 0.10
-    rotate_limit: 45
+    shift_limit: 0.0625     # max fraction of image side to shift
+    scale_limit: 0.10       # max scale factor delta
+    rotate_limit: 45        # degrees
+    border_mode: 0
     p: 0.4
 
-# Pixel / colour transforms
+# ── Pixel / Colour Transforms ──────────────────────────────
 pixel:
   random_brightness_contrast:
-    brightness_limit: 0.25
-    contrast_limit: 0.25
+    brightness_limit: 0.30
+    contrast_limit: 0.30
     p: 0.5
+
   hue_saturation_value:
     hue_shift_limit: 15
     sat_shift_limit: 30
     val_shift_limit: 20
     p: 0.4
+
   clahe:
+    # Contrast-Limited Adaptive Histogram Equalization
     clip_limit: 4.0
+    tile_grid_size: [8, 8]
     p: 0.4
 
-# Blur & noise transforms
+# ── Blur & Noise Transforms ────────────────────────────────
 blur:
   gaussian_blur:
+    # blur_limit: [min_kernel, max_kernel] — must be odd integers
     blur_limit: [3, 7]
-    p: 0.3
+    p: 0.30
+
   motion_blur:
-    blur_limit: 5
+    blur_limit: 7           # max kernel size for motion blur
     p: 0.25
+
+# ── Output ─────────────────────────────────────────────────
+output:
+  # Prefix added to all augmented image/label filenames
+  file_prefix: "aug"
+
+  # JPEG compression quality for saved augmented images (1–100)
+  jpeg_quality: 95
+
+  # Save augmented images directly into the YOLO train split?
+  # If false, they are saved to dataset/augmented/ instead
+  save_to_train: true
+
+  # Generate before/after distribution charts
+  generate_charts: true
+
+  # Save JSON augmentation statistics report
+  save_stats_json: true
+  stats_json_path: "reports/augmentation_stats.json"
+
+  # Directory for before/after distribution chart PNGs
+  charts_dir: "reports/graphs"
