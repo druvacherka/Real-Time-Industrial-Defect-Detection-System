@@ -68,12 +68,19 @@ app = FastAPI(
 
 # ── CORS Middleware ────────────────────────────────────────────────────────
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+	CORSMiddleware,
+	allow_origins=ALLOWED_ORIGINS,
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
 )
+
+# ── Prometheus Instrumentation ──────────────────────────────────────────────
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+except ImportError:
+    pass
 
 
 # ── Request/Response Logging Middleware ─────────────────────────────────────

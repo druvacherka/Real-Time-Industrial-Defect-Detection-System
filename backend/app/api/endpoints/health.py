@@ -19,7 +19,7 @@ router = APIRouter()
     "/health",
     response_model=HealthResponse,
     summary="Health check",
-    description="Returns the current health status of the API service.",
+    description="Returns the current health status of the API service along with CPU and memory usage.",
     tags=["General"],
 )
 async def health_check():
@@ -30,8 +30,21 @@ async def health_check():
     Returns the service name, status, and current version.
     """
     logger.info("Health check requested")
+    
+    cpu_usage = 0.0
+    mem_usage = 0.0
+    try:
+        import psutil
+        cpu_usage = psutil.cpu_percent()
+        mem_usage = psutil.virtual_memory().percent
+    except ImportError:
+        # Fallback if psutil is not installed
+        pass
+
     return HealthResponse(
         status="healthy",
         service="Industrial Defect Detection",
         version=APP_VERSION,
+        cpu_percent=cpu_usage,
+        memory_percent=mem_usage,
     )
