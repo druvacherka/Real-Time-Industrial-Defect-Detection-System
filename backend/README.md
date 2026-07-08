@@ -114,6 +114,27 @@ Once the server is running:
 
 ---
 
+## Deployment & Monitoring
+
+### Docker Deployment
+The system can be deployed as multi-container applications using Docker and Docker Compose.
+
+To deploy in production:
+```bash
+# Start all services (API, Prometheus, Grafana)
+docker-compose up -d --build
+```
+
+### Health check & Prometheus Metrics
+- **Health Check Endpoint**: `GET http://localhost:8000/health` (includes version, status, CPU and memory usage statistics).
+- **Metrics Scraping Endpoint**: `GET http://localhost:8000/metrics` (exposes Prometheus-compliant system and HTTP request counters).
+
+### Monitoring Infrastructure
+- **Prometheus UI**: `http://localhost:9090` (configured to scrape API server metrics automatically).
+- **Grafana UI**: `http://localhost:3000` (default credentials: `admin` / `admin`). Set up a Prometheus datasource targeting `http://prometheus:9090` to construct custom system health dashboards.
+
+---
+
 ## License
 
 MIT — see the root [LICENSE](../LICENSE) file.

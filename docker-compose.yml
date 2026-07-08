@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  # ── API Application Server ──
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: defect-detection-api
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LOG_DIR=/app/logs
+      - UPLOAD_DIR=/app/backend/uploads
+    volumes:
+      - api-logs:/app/logs
+      - api-uploads:/app/backend/uploads
+      - ./models:/app/models
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Prometheus Server (Monitoring) ──
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: defect-detection-prometheus
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    restart: always
+
+  # ── Grafana Dashboard ──
+  grafana:
+    image: grafana/grafana:latest
+    container_name: defect-detection-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: always
+    depends_on:
+      - prometheus
+
+volumes:
+  api-logs:
+  api-uploads:

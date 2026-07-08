@@ -24,6 +24,8 @@ ultralytics>=8.1.0
 
 # Logging & Monitoring
 python-json-logger>=2.0.7
+prometheus-fastapi-instrumentator>=7.0.0
+psutil>=5.9.8
 
 # Testing
 pytest>=8.0.0
