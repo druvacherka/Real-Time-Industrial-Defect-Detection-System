@@ -136,3 +136,68 @@ def generate_markdown_report(metrics_dict: dict, output_path: Path):
     
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info(f"Successfully generated markdown evaluation report at: {output_path}")
+
+
+def generate_splits_comparison_report(val_metrics: dict, test_metrics: dict, output_path: Path):
+    """
+    Saves a comparative report comparing validation vs test split performance metrics.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    lines = [
+        "# Model Splits Performance Comparison Report",
+        f"> Generated: {timestamp}",
+        "",
+        "## Overall Comparative Performance",
+        "",
+        "| Metric | Validation Split | Test Split | Delta (Test - Val) |",
+        "|---|---|---|---|",
+    ]
+    
+    val_overall = val_metrics.get("overall", {})
+    test_overall = test_metrics.get("overall", {})
+    
+    for metric_name in ["precision", "recall", "map50", "map95"]:
+        val_val = val_overall.get(metric_name, 0.0)
+        test_val = test_overall.get(metric_name, 0.0)
+        delta = test_val - val_val
+        lines.append(f"| {metric_name.upper()} | {val_val:.4f} | {test_val:.4f} | {delta:+.4f} |")
+        
+    lines.extend([
+        "",
+        "## Class-wise Comparative Performance",
+        "",
+        "| Class ID | Class Name | Val mAP@0.5 | Test mAP@0.5 | Delta mAP@0.5 | Val mAP@0.5:0.95 | Test mAP@0.5:0.95 | Delta mAP@0.5:0.95 |",
+        "|---|---|---|---|---|---|---|---|",
+    ])
+    
+    val_classes = val_metrics.get("classes", {})
+    test_classes = test_metrics.get("classes", {})
+    
+    for class_id in sorted(val_classes.keys()):
+        val_data = val_classes.get(class_id, {})
+        test_data = test_classes.get(class_id, {})
+        
+        val_map50 = val_data.get("map50", 0.0)
+        test_map50 = test_data.get("map50", 0.0)
+        delta_map50 = test_map50 - val_map50
+        
+        val_map95 = val_data.get("map95", 0.0)
+        test_map95 = test_data.get("map95", 0.0)
+        delta_map95 = test_map95 - val_map95
+        
+        lines.append(
+            f"| {class_id} | {val_data.get('name', 'N/A')} | "
+            f"{val_map50:.4f} | {test_map50:.4f} | {delta_map50:+.4f} | "
+            f"{val_map95:.4f} | {test_map95:.4f} | {delta_map95:+.4f} |"
+        )
+        
+    lines.extend([
+        "",
+        "---",
+        "*Report generated automatically by the Defect Detection System Evaluation Framework.*"
+    ])
+    
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    logger.info(f"Successfully generated splits comparison report at: {output_path}")
