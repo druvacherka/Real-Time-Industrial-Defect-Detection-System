@@ -63,6 +63,13 @@ Executing the evaluation script ([evaluate.py](file:///c:/Users/druva/projects/R
 * Includes overall metrics (Precision, Recall, mAP50, mAP95).
 * Outlines detailed class-wise performance tables for all 6 defect categories.
 
+### 3. Splits Comparative Performance Report
+To compare how the model performs on the validation split vs. the test split side-by-side, use the splits comparison script:
+```bash
+.\venv\Scripts\python.exe scripts/compare_splits_performance.py
+```
+This runs evaluation sequentially on both splits and generates a detailed comparison report (`results/splits_comparison_report.md`), including Deltas (Test - Val) to trace generalization gaps.
+
 ---
 
 ## 🧪 Running Unit Tests

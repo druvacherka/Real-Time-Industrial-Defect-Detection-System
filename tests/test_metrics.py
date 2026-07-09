@@ -88,6 +88,34 @@ class TestMetrics(unittest.TestCase):
         self.assertIn("inclusion", content)
         self.assertIn("0.8456", content)
 
+    def test_generate_splits_comparison_report(self):
+        """Should generate side-by-side comparative table for splits."""
+        from utils.metrics import generate_splits_comparison_report
+        
+        val_metrics = {
+            "overall": {"precision": 0.80, "recall": 0.70, "map50": 0.75, "map95": 0.50},
+            "classes": {
+                0: {"name": "crazing", "precision": 0.80, "recall": 0.70, "map50": 0.75, "map95": 0.50}
+            }
+        }
+        test_metrics = {
+            "overall": {"precision": 0.82, "recall": 0.72, "map50": 0.77, "map95": 0.52},
+            "classes": {
+                0: {"name": "crazing", "precision": 0.82, "recall": 0.72, "map50": 0.77, "map95": 0.52}
+            }
+        }
+        
+        report_path = self.temp_dir / "comparison_report.md"
+        generate_splits_comparison_report(val_metrics, test_metrics, report_path)
+        
+        self.assertTrue(report_path.exists(), "comparison_report.md was not created")
+        content = report_path.read_text(encoding="utf-8")
+        self.assertIn("# Model Splits Performance Comparison Report", content)
+        self.assertIn("crazing", content)
+        self.assertIn("0.8000", content)
+        self.assertIn("0.8200", content)
+        self.assertIn("+0.0200", content)
+
 
 if __name__ == "__main__":
     unittest.main()
