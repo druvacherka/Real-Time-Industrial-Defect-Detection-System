@@ -49,15 +49,16 @@ MAX_VIDEO_SIZE_MB = 50
 preprocessor = ImagePreprocessingService(target_size=(640, 640), normalize=True)
 
 
-def _validate_image_format(filename: str) -> str:
-    """Validate uploaded file has a supported image extension."""
+def _validate_image_format(filename: str, content_type: str) -> str:
+    """Validate uploaded file has a supported image extension and content type."""
     ext = Path(filename).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
+    allowed_mimetypes = {"image/jpeg", "image/jpg", "image/png"}
+    if ext not in ALLOWED_EXTENSIONS or content_type not in allowed_mimetypes:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "unsupported_format",
-                "message": f"File format '{ext}' is not supported. "
+                "message": f"File format '{ext}' with content type '{content_type}' is not supported. "
                            f"Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
                 "filename": filename,
             },
@@ -114,7 +115,7 @@ async def predict_image(
     )
 
     # Step 1 — Validate format
-    ext = _validate_image_format(file.filename)
+    ext = _validate_image_format(file.filename, file.content_type)
 
     # Step 2 — Read file contents
     try:
@@ -132,6 +133,29 @@ async def predict_image(
         )
     if len(contents) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Step 3.5 — Decode image and validate dimensions
+    try:
+        import cv2
+        import numpy as np
+        arr = np.frombuffer(contents, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("OpenCV decoding failed")
+        h, w = img.shape[:2]
+        if h < 32 or w < 32 or h > 8192 or w > 8192:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_dimensions",
+                    "message": f"Image dimensions {w}x{h} are out of allowed bounds [32x32 to 8192x8192].",
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning(f"[{request_id}] Complete dimension/corruption validation failed: {exc}")
+        raise HTTPException(status_code=400, detail="Corrupted image: decoding failed")
 
     # Step 4 — Save temporarily
     save_filename = f"{request_id}_{file.filename}"
