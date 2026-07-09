@@ -133,21 +133,21 @@ Prepare, balance, and validate the dataset using the automated script pipeline:
 ```bash
 # Step 1: Verify raw dataset integrity
 python scripts/verify_raw_dataset.py
-
+ 
 # Step 2: Convert VOC XML to YOLO TXT format and split
 python scripts/convert_to_yolo.py
-
-# Step 3: Run comprehensive pair and annotation validation
+ 
+# Step 3: Run comprehensive pair and annotation validation (generates reports/dataset_validation_report.md)
 python scripts/verify_dataset.py
-
-# Step 4: Balance class distribution using Albumentations offline augmentation
+ 
+# Step 4: Balance class distribution using Albumentations offline augmentation (generates reports/dataset_balancing_report.md)
 python scripts/augment_dataset.py
 
-# Step 5: Validate the final augmented dataset splits and build final configurations
-python scripts/build_final_dataset.py
+# Step 5: Preprocess split images (resizing, normalising, corruption check)
+python scripts/preprocess_pipeline.py
 
-# Step 6: Generate class distribution graphs and MD reports
-python scripts/generate_reports.py
+# Step 6: Generate dataset statistics and visualization graphs (generates reports/dataset_statistics_report.md)
+python scripts/dataset_stats.py
 ```
 
 ### 3. Model Training & Evaluation

@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-07-09 19:58:24",
+  "target_size": [
+    640,
+    640
+  ],
+  "normalize": true,
+  "save_format": ".png",
+  "total_processed": 2649,
+  "total_skipped": 0,
+  "per_split": {
+    "train": {
+      "processed": 2109,
+      "skipped": 0,
+      "total": 2109
+    },
+    "val": {
+      "processed": 360,
+      "skipped": 0,
+      "total": 360
+    },
+    "test": {
+      "processed": 180,
+      "skipped": 0,
+      "total": 180
+    }
+  },
+  "timing": {
+    "mean_ms": 21.11,
+    "median_ms": 19.0,
+    "total_seconds": 55.91
+  }
+}

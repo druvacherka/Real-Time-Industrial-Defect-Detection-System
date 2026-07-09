@@ -131,23 +131,23 @@ Augmented files are named `aug_<original_stem>_<idx>.jpg`.
 ## Running the Pipeline
 
 ```bash
-# 1. Convert raw XML → YOLO (first-time only)
+# 1. Verify raw dataset integrity
+python scripts/verify_raw_dataset.py
+
+# 2. Convert VOC XML → YOLO (first-time only)
 python scripts/convert_to_yolo.py
 
-# 2. Full dataset build (fix IDs + validate + write data.yaml + summary)
-python scripts/build_final_dataset.py
+# 3. Run comprehensive validation suite
+python scripts/verify_dataset.py
 
-# 3. Augment & balance (if re-running augmentation)
+# 4. Balance minority classes using Albumentations offline augmentation
 python scripts/augment_dataset.py
 
-# 4. Validate all pairs
-python scripts/validate_pairs.py
+# 5. Run image preprocessing (resizing and normalization)
+python scripts/preprocess_pipeline.py
 
-# 5. Generate statistics + charts
+# 6. Generate dataset statistics and charts
 python scripts/dataset_stats.py
-
-# 6. Generate quality reports
-python scripts/generate_reports.py
 ```
 
 ---
@@ -156,11 +156,10 @@ python scripts/generate_reports.py
 
 | Report | Location |
 |--------|----------|
-| Dataset quality | `reports/dataset_quality_report.md` |
-| Class distribution | `reports/class_distribution.md` |
-| Preprocessing validation | `reports/preprocessing_validation_summary.md` |
-| Pair validation | `reports/validation_report.md` |
-| Final summary | `reports/final_dataset_summary.md` |
-| Bar chart | `reports/graphs/class_distribution_bar.png` |
-| Pie chart | `reports/graphs/class_distribution_pie.png` |
-| Per-split chart | `reports/graphs/class_distribution_per_split.png` |
+| Dataset validation | `reports/dataset_validation_report.md` |
+| Dataset balancing | `reports/dataset_balancing_report.md` |
+| Preprocessing statistics | `reports/preprocessing_statistics.json` |
+| Dataset statistics | `reports/dataset_statistics_report.md` |
+| Class distribution chart | `reports/visualizations/class_distribution.png` |
+| Dataset split chart | `reports/visualizations/dataset_split.png` |
+| Image sample visualizations | `reports/visualizations/sample_*.jpg` |

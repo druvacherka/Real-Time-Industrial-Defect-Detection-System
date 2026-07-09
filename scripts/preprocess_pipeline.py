@@ -1,367 +1,208 @@
 #!/usr/bin/env python3
 """
-Image Preprocessing Pipeline
-==============================
+Image Preprocessing Pipeline (Refactored)
+========================================
 Real-Time Industrial Defect Detection System
 
 Production pipeline for:
   - Resizing images to uniform dimensions
   - Normalizing pixel values
-  - Removing corrupted files
+  - Skipping corrupted files
   - Saving processed images
   - Generating preprocessing statistics
-  - Hooks for Albumentations augmentation
 
-Author: saniyamirjanavar-hash
-Date: 2026-07-07  refactor: use shared config module
+Utilizes the modular preprocessing helpers in utils.preprocessing.
+Generates reports/preprocessing_statistics.json.
 """
 
+from __future__ import annotations
+
+import argparse
+import json
+import logging
 import sys
 import time
-import logging
-import json
 from pathlib import Path
-from collections import defaultdict
-from typing import Tuple, Optional, List, Callable
 
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Allow running as a standalone script from the project root
-# ---------------------------------------------------------------------------
+# Bootstrap path resolution
 _SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
+_PROJECT_ROOT = _SCRIPTS_DIR.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
-from config import (
-    IMAGES_DIR as INPUT_DIR, PROCESSED_DIR as OUTPUT_DIR,
-    REPORTS_DIR, LOGS_DIR, SPLITS, TARGET_SIZE as DEFAULT_TARGET_SIZE,
-    IMAGE_EXTENSIONS as SUPPORTED_EXTENSIONS, ensure_dirs,
+from scripts.config import (
+    IMAGES_DIR as INPUT_DIR,
+    PROCESSED_DIR as OUTPUT_DIR,
+    REPORTS_DIR,
+    LOGS_DIR,
+    SPLITS,
+    TARGET_SIZE,
+    IMAGE_EXTENSIONS,
+    ensure_dirs,
 )
+from utils.preprocessing import preprocess_and_save
 
-try:
-    import cv2
-    HAS_OPENCV = True
-except ImportError:
-    HAS_OPENCV = False
-    print("[WARNING] OpenCV not installed. Install with: pip install opencv-python")
+# Initialize logging
+ensure_dirs(LOGS_DIR, REPORTS_DIR)
+logger = logging.getLogger("preprocessing")
+logger.setLevel(logging.INFO)
 
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-ensure_dirs(LOGS_DIR)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(LOGS_DIR / "preprocess_pipeline.log", mode="a"),
-    ],
-)
-logger = logging.getLogger("preprocess_pipeline")
+if logger.handlers:
+    logger.handlers.clear()
 
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-class AugmentationHook:
-    """
-    Base class for augmentation hooks.
+# File handler
+fh = logging.FileHandler(LOGS_DIR / "preprocess_pipeline.log", mode="a", encoding="utf-8")
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
-    Subclass this and override `__call__` to integrate Albumentations
-    or any other augmentation library in the future.
-
-    Example:
-        class AlbumentationsHook(AugmentationHook):
-            def __init__(self):
-                import albumentations as A
-                self.transform = A.Compose([
-                    A.HorizontalFlip(p=0.5),
-                    A.RandomBrightnessContrast(p=0.3),
-                    A.GaussNoise(p=0.2),
-                ])
-
-            def __call__(self, image: np.ndarray) -> np.ndarray:
-                return self.transform(image=image)["image"]
-    """
-
-    def __call__(self, image: np.ndarray) -> np.ndarray:
-        """Apply augmentation (no-op by default)."""
-        return image
+# Console handler
+ch = logging.StreamHandler(sys.stdout)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 
 class PreprocessingPipeline:
-    """
-    End-to-end image preprocessing pipeline.
-
-    Steps:
-        1. Scan source directories for images
-        2. Read and validate each image
-        3. Remove / skip corrupted files
-        4. Resize to target dimensions
-        5. Normalize pixel values to [0, 1]
-        6. Apply optional augmentation hook
-        7. Save processed images
-        8. Generate statistics report
-    """
+    """End-to-end image preprocessing pipeline coordinator."""
 
     def __init__(
         self,
         input_dir: Path = INPUT_DIR,
         output_dir: Path = OUTPUT_DIR,
-        target_size: Tuple[int, int] = DEFAULT_TARGET_SIZE,
         normalize: bool = True,
         save_format: str = ".png",
-        augmentation_hook: Optional[AugmentationHook] = None,
-    ):
-        if not HAS_OPENCV:
-            raise RuntimeError("OpenCV is required for the preprocessing pipeline.")
-
+    ) -> None:
         self.input_dir = input_dir
         self.output_dir = output_dir
-        self.target_size = target_size
+        self.target_size = TARGET_SIZE
         self.normalize = normalize
         self.save_format = save_format
-        self.augmentation_hook = augmentation_hook or AugmentationHook()
 
-        # Statistics
+        # Statistics tracker
         self.stats = {
             "total_processed": 0,
             "total_skipped": 0,
-            "total_corrupted": 0,
             "per_split": {},
-            "original_sizes": [],
             "processing_times": [],
         }
 
-        self._corrupted_files: List[str] = []
-
-    # ------------------------------------------------------------------
-    # Directory setup
-    # ------------------------------------------------------------------
-    def setup_output_dirs(self):
-        """Create output directory structure."""
+    def setup_dirs(self) -> None:
+        """Ensure output directories exist."""
         for split in SPLITS:
-            out_dir = self.output_dir / split
-            out_dir.mkdir(parents=True, exist_ok=True)
-        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Output directories created under {self.output_dir}")
+            (self.output_dir / split).mkdir(parents=True, exist_ok=True)
 
-    # ------------------------------------------------------------------
-    # Image reading and corruption check
-    # ------------------------------------------------------------------
-    def read_and_validate(self, img_path: Path) -> Optional[np.ndarray]:
-        """
-        Read an image and check for corruption.
+    def process_split(self, split: str) -> None:
+        """Process all images in a given split directory."""
+        in_split_dir = self.input_dir / split
+        out_split_dir = self.output_dir / split
 
-        Returns None for corrupted files.
-        """
-        try:
-            img = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
-            if img is None:
-                raise ValueError("cv2.imread returned None")
-            if img.shape[0] == 0 or img.shape[1] == 0:
-                raise ValueError("Zero-dimension image")
-            if img.size == 0:
-                raise ValueError("Empty image array")
-            return img
-        except Exception as exc:
-            logger.warning(f"  [CORRUPTED] {img_path.name}: {exc}")
-            self._corrupted_files.append(str(img_path))
-            self.stats["total_corrupted"] += 1
-            return None
+        if not in_split_dir.exists():
+            logger.info("  [%s] Input split dir not found, skipping", split.upper())
+            return
 
-    # ------------------------------------------------------------------
-    # Resize
-    # ------------------------------------------------------------------
-    def resize(self, img: np.ndarray) -> np.ndarray:
-        """Resize image to target dimensions."""
-        h, w = img.shape[:2]
-        if (w, h) == self.target_size:
-            return img
-        return cv2.resize(
-            img,
-            self.target_size,
-            interpolation=cv2.INTER_LINEAR,
-        )
-
-    # ------------------------------------------------------------------
-    # Normalize
-    # ------------------------------------------------------------------
-    @staticmethod
-    def normalize_pixels(img: np.ndarray) -> np.ndarray:
-        """Normalize pixel values from [0, 255] to [0.0, 1.0]."""
-        return img.astype(np.float32) / 255.0
-
-    # ------------------------------------------------------------------
-    # Process single image
-    # ------------------------------------------------------------------
-    def process_image(self, img_path: Path, output_path: Path) -> bool:
-        """
-        Process a single image through the full pipeline.
-
-        Returns True if successful, False otherwise.
-        """
-        start = time.time()
-
-        # Read & validate
-        img = self.read_and_validate(img_path)
-        if img is None:
-            return False
-
-        original_h, original_w = img.shape[:2]
-        self.stats["original_sizes"].append((original_w, original_h))
-
-        # Resize
-        img = self.resize(img)
-
-        # Normalize (save as float32 .npy or convert back for image formats)
-        if self.normalize and self.save_format == ".npy":
-            img = self.normalize_pixels(img)
-
-        # Augmentation hook
-        img = self.augmentation_hook(img)
-
-        # Save
-        try:
-            if self.save_format == ".npy":
-                np.save(str(output_path.with_suffix(".npy")), img)
-            else:
-                if img.dtype == np.float32:
-                    img = (img * 255).astype(np.uint8)
-                cv2.imwrite(str(output_path), img)
-        except Exception as exc:
-            logger.error(f"  Failed to save {output_path.name}: {exc}")
-            return False
-
-        elapsed = time.time() - start
-        self.stats["processing_times"].append(elapsed)
-        return True
-
-    # ------------------------------------------------------------------
-    # Process split
-    # ------------------------------------------------------------------
-    def process_split(self, split: str) -> dict:
-        """Process all images in a given split."""
-        in_dir = self.input_dir / split
-        out_dir = self.output_dir / split
-
-        if not in_dir.exists():
-            logger.info(f"  [{split.upper()}] Input directory not found, skipping")
-            return {"processed": 0, "skipped": 0, "corrupted": 0}
-
-        image_files = sorted([
-            f for f in in_dir.iterdir()
-            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS
+        img_files = sorted([
+            f for f in in_split_dir.iterdir()
+            if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS
         ])
 
         processed = 0
         skipped = 0
 
-        for img_path in image_files:
-            out_path = out_dir / f"{img_path.stem}{self.save_format}"
-
-            if self.process_image(img_path, out_path):
+        for img_path in img_files:
+            out_path = out_split_dir / f"{img_path.stem}{self.save_format}"
+            
+            start_time = time.time()
+            success = preprocess_and_save(
+                img_path,
+                out_path,
+                self.target_size,
+                self.normalize,
+                self.save_format
+            )
+            elapsed = time.time() - start_time
+            
+            if success:
                 processed += 1
+                self.stats["processing_times"].append(elapsed)
             else:
                 skipped += 1
 
-        split_stats = {
+        self.stats["per_split"][split] = {
             "processed": processed,
             "skipped": skipped,
-            "total": len(image_files),
+            "total": len(img_files)
         }
-        self.stats["per_split"][split] = split_stats
-
+        
         logger.info(
-            f"  [{split.upper()}] Processed: {processed} | "
-            f"Skipped: {skipped} / {len(image_files)}"
+            "  [%s] Processed: %d | Skipped: %d / %d",
+            split.upper(), processed, skipped, len(img_files)
         )
-        return split_stats
 
-    # ------------------------------------------------------------------
-    # Generate statistics report
-    # ------------------------------------------------------------------
-    def generate_statistics(self) -> Path:
-        """Generate and save preprocessing statistics."""
+    def save_stats(self) -> Path:
+        """Save pipeline stats to reports/preprocessing_statistics.json."""
         report_path = REPORTS_DIR / "preprocessing_statistics.json"
-
+        
         times = self.stats["processing_times"]
-        sizes = self.stats["original_sizes"]
-
         summary = {
+            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "target_size": list(self.target_size),
             "normalize": self.normalize,
             "save_format": self.save_format,
             "total_processed": self.stats["total_processed"],
             "total_skipped": self.stats["total_skipped"],
-            "total_corrupted": self.stats["total_corrupted"],
-            "corrupted_files": self._corrupted_files,
             "per_split": self.stats["per_split"],
             "timing": {
                 "mean_ms": round(np.mean(times) * 1000, 2) if times else 0,
                 "median_ms": round(np.median(times) * 1000, 2) if times else 0,
-                "max_ms": round(max(times) * 1000, 2) if times else 0,
                 "total_seconds": round(sum(times), 2) if times else 0,
-            },
-            "original_sizes": {
-                "unique_sizes": len(set(sizes)),
-                "min_width": min(s[0] for s in sizes) if sizes else 0,
-                "max_width": max(s[0] for s in sizes) if sizes else 0,
-                "min_height": min(s[1] for s in sizes) if sizes else 0,
-                "max_height": max(s[1] for s in sizes) if sizes else 0,
-            },
+            }
         }
-
-        with open(report_path, "w") as fh:
-            json.dump(summary, fh, indent=2)
-
-        logger.info(f"Statistics saved to {report_path}")
+        
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2)
+            
         return report_path
 
-    # ------------------------------------------------------------------
-    # Run
-    # ------------------------------------------------------------------
-    def run(self):
-        """Execute the full preprocessing pipeline."""
+    def run(self) -> None:
+        """Run full preprocessing pipeline."""
         logger.info("=" * 60)
         logger.info("STARTING PREPROCESSING PIPELINE")
-        logger.info(f"  Input:  {self.input_dir}")
-        logger.info(f"  Output: {self.output_dir}")
-        logger.info(f"  Target: {self.target_size}")
-        logger.info(f"  Normalize: {self.normalize}")
         logger.info("=" * 60)
 
-        pipeline_start = time.time()
-        self.setup_output_dirs()
+        start_time = time.time()
+        self.setup_dirs()
 
         for split in SPLITS:
             self.process_split(split)
 
-        self.stats["total_processed"] = sum(
-            s.get("processed", 0) for s in self.stats["per_split"].values()
-        )
-        self.stats["total_skipped"] = sum(
-            s.get("skipped", 0) for s in self.stats["per_split"].values()
-        )
+        self.stats["total_processed"] = sum(s["processed"] for s in self.stats["per_split"].values())
+        self.stats["total_skipped"] = sum(s["skipped"] for s in self.stats["per_split"].values())
 
-        report = self.generate_statistics()
+        report_path = self.save_stats()
+        elapsed = time.time() - start_time
 
-        elapsed = time.time() - pipeline_start
         logger.info("=" * 60)
-        logger.info("PREPROCESSING COMPLETE")
-        logger.info(f"  Processed: {self.stats['total_processed']}")
-        logger.info(f"  Skipped:   {self.stats['total_skipped']}")
-        logger.info(f"  Corrupted: {self.stats['total_corrupted']}")
-        logger.info(f"  Time:      {elapsed:.2f}s")
-        logger.info(f"  Report:    {report}")
+        logger.info("PREPROCESSING PIPELINE COMPLETE in %.2fs", elapsed)
+        logger.info("  Processed: %d", self.stats["total_processed"])
+        logger.info("  Skipped:   %d", self.stats["total_skipped"])
+        logger.info("  Stats Report: %s", report_path)
         logger.info("=" * 60)
 
 
-def main():
-    """Entry point for the preprocessing pipeline."""
-    pipeline = PreprocessingPipeline(
-        target_size=DEFAULT_TARGET_SIZE,
-        normalize=True,
-        save_format=".png",
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Image Preprocessing Pipeline.")
+    parser.add_argument(
+        "--no-norm",
+        action="store_false",
+        dest="normalize",
+        help="Disable float normalization."
     )
+    args = parser.parse_args()
+
+    pipeline = PreprocessingPipeline(normalize=args.normalize)
     pipeline.run()
 
 
