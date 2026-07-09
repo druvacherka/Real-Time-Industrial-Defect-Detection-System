@@ -112,7 +112,8 @@ def main():
                 "classes": {}
             }
             # Extract class-wise metrics
-            for i, class_name in names.items():
+            for i in range(len(metrics.box.all_ap)):
+                class_name = names.get(i, f"class_{i}")
                 # class_result returns (precision, recall, map50, map95)
                 res = metrics.box.class_result(i)
                 metrics_dict["classes"][i] = {

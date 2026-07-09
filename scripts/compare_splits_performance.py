@@ -34,7 +34,8 @@ def extract_metrics(metrics, model) -> dict:
         "classes": {}
     }
     # Extract class-wise metrics
-    for i, class_name in names.items():
+    for i in range(len(metrics.box.all_ap)):
+        class_name = names.get(i, f"class_{i}")
         res = metrics.box.class_result(i)
         metrics_dict["classes"][i] = {
             "name": class_name,
