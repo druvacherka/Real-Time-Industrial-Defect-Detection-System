@@ -216,6 +216,12 @@ class YOLOv8ModelWrapper:
 
         return response
 
+    def predict_batch(self, images: List[np.ndarray]) -> List[PredictionResponse]:
+        """
+        Run prediction on a batch of preprocessed images.
+        """
+        return [self.predict(img) for img in images]
+
     def get_model_info(self) -> Dict[str, Any]:
         """Return model metadata."""
         return {

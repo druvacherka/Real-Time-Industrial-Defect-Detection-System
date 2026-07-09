@@ -81,27 +81,31 @@ class ModelService:
             raise RuntimeError("YOLO model is not loaded in memory")
 
         start_time = time.time()
+        logger.info(f"ModelService: starting video inference pipeline for {video_path}")
         try:
             import cv2
             cap = cv2.VideoCapture(str(video_path))
             if not cap.isOpened():
-                raise ValueError("Could not open video file")
+                raise ValueError("Could not open video file via OpenCV")
 
             fps = cap.get(cv2.CAP_PROP_FPS)
             frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
             duration = frame_count / fps if fps > 0 else 0.0
+
+            logger.info(
+                f"ModelService: loaded video metadata: resolution={width}x{height}, "
+                f"fps={fps:.2f}, total_frames={frame_count}, duration={duration:.2f}s"
+            )
             
             total_detections = 0
             class_counts = {}
-
-            # Process every Nth frame to speed up inference if video is long (e.g. sample every 5th frame)
-            # For short/precise videos, we can process all frames. Let's process every 5th frame.
             frame_idx = 0
             processed_frames = 0
             sample_rate = 5
+            batch_size = 8
+            frame_batch = []
 
             while cap.isOpened():
                 ret, frame = cap.read()
@@ -109,21 +113,34 @@ class ModelService:
                     break
 
                 if frame_idx % sample_rate == 0:
-                    # Convert BGR to RGB (matching preprocessor output expected by model)
+                    # Preprocess frame before inference (BGR -> RGB)
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    # Resize to target input size
                     frame_resized = cv2.resize(frame_rgb, (640, 640), interpolation=cv2.INTER_LINEAR)
-                    
-                    # Run inference on frame
-                    prediction = self.model_wrapper.predict(frame_resized)
-                    for det in prediction.detections:
-                        total_detections += 1
-                        class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
-                    processed_frames += 1
+                    frame_batch.append(frame_resized)
+
+                    if len(frame_batch) == batch_size:
+                        logger.debug(f"ModelService: processing batch of {len(frame_batch)} frames (idx: {frame_idx})")
+                        predictions = self.model_wrapper.predict_batch(frame_batch)
+                        for prediction in predictions:
+                            for det in prediction.detections:
+                                total_detections += 1
+                                class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
+                        processed_frames += len(frame_batch)
+                        frame_batch.clear()
 
                 frame_idx += 1
 
+            if frame_batch:
+                logger.debug(f"ModelService: processing remaining batch of {len(frame_batch)} frames")
+                predictions = self.model_wrapper.predict_batch(frame_batch)
+                for prediction in predictions:
+                    for det in prediction.detections:
+                        total_detections += 1
+                        class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
+                processed_frames += len(frame_batch)
+
             cap.release()
+            logger.info("ModelService: released OpenCV VideoCapture resource")
 
             # Format detection summary
             from app.models.model_loader import DEFECT_CLASSES
@@ -139,7 +156,7 @@ class ModelService:
 
             processing_time = time.time() - start_time
             logger.info(
-                f"Video inference completed: processed {processed_frames}/{frame_count} frames, "
+                f"ModelService: video inference completed: processed {processed_frames}/{frame_count} frames, "
                 f"detected {total_detections} total defects in {processing_time:.2f} s"
             )
 
