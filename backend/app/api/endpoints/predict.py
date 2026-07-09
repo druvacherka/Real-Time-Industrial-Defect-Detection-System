@@ -374,7 +374,8 @@ async def predict_video(
     summary="Initiate live stream defect prediction",
     description=(
         "Start a defect detection session on a live RTSP/RTMP stream or webcam. "
-        "The stream is validated and initialized using OpenCV VideoCapture."
+        "The stream is validated and initialized using OpenCV VideoCapture with "
+        "automatic error recovery and retry logic."
     ),
     responses={
         400: {"description": "Invalid stream URL or connection failure"},
@@ -395,13 +396,41 @@ async def predict_live(
     if source.isdigit():
         source = int(source)
 
+    cap = None
+    connected = False
+    
+    # Connection retry logic for automatic error recovery
+    for attempt in range(1, 4):
+        try:
+            logger.info(f"[{request_id}] Connection attempt {attempt}/3 to source: {source}")
+            cap = cv2.VideoCapture(source)
+            if cap.isOpened():
+                # Verify we can read a frame
+                for read_attempt in range(1, 4):
+                    ret, frame = cap.read()
+                    if ret:
+                        connected = True
+                        break
+                    time.sleep(0.1)
+                if connected:
+                    break
+            logger.warning(f"[{request_id}] Attempt {attempt} failed to stream from source: {source}")
+        except Exception as e:
+            logger.warning(f"[{request_id}] Attempt {attempt} exception: {e}")
+        finally:
+            if not connected and cap is not None:
+                cap.release()
+        if attempt < 3:
+            time.sleep(0.5)
+
+    if not connected:
+        logger.error(f"[{request_id}] Live stream connection failed after 3 attempts")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Live stream connection failed for source: {request_data.source} after 3 attempts.",
+        )
+
     try:
-        # Validate stream connection using OpenCV VideoCapture
-        import cv2
-        cap = cv2.VideoCapture(source)
-        if not cap.isOpened():
-            raise ValueError(f"Could not open live stream source: {request_data.source}")
-        
         # Read resolution and FPS
         fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -428,8 +457,8 @@ async def predict_live(
             prediction=prediction_details,
         )
     except Exception as exc:
-        logger.error(f"[{request_id}] Live stream connection failed: {exc}")
+        logger.error(f"[{request_id}] Live stream configuration extraction failed: {exc}")
         raise HTTPException(
             status_code=400,
-            detail=f"Live stream connection failed: {str(exc)}",
+            detail=f"Live stream configuration extraction failed: {str(exc)}",
         )
