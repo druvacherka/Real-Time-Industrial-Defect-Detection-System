@@ -26,14 +26,28 @@ To check raw image annotations visually, use [visualize_annotations.py](file:///
 The core pipeline scripts reside in the `training/` folder:
 
 ### 1. Model Training
-[train.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/train.py) implements the YOLOv8 training loop. It parses parameters from [configs/experiment.yaml](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/configs/experiment.yaml), validates configuration settings, and saves checkpoints/logs under `results/`.
-```bash
-# Run training with custom overrides
-.\venv\Scripts\python.exe training/train.py --epochs 100 --batch_size 16 --device cpu
+[train.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/train.py) implements the YOLOv8 training loop. 
 
-# Run a quick training pipeline check (dry-run mode)
-.\venv\Scripts\python.exe training/train.py --dry-run
+To execute model training, run the orchestration execution script:
+```bash
+# Run training in dry-run mode
+.\venv\Scripts\python.exe scripts/execute_model_training.py --dry-run
+
+# Run full-scale model training with custom hyperparameter overrides
+.\venv\Scripts\python.exe scripts/execute_model_training.py --epochs 100 --batch_size 16 --patience 10 --device cuda
+
+# Resume training from the last saved checkpoint
+.\venv\Scripts\python.exe scripts/execute_model_training.py --resume
 ```
+
+### Options
+* `--config`: Path to experiment YAML config (defaults to `configs/experiment.yaml`).
+* `--epochs`: Override maximum number of training epochs.
+* `--batch_size`: Override batch size.
+* `--patience`: Early stopping patience (number of epochs to wait for validation mAP improvements before stopping).
+* `--resume`: Resume training from the last checkpoint (`results/train_yolov8n/weights/last.pt`).
+* `--device`: Hardware device selector (`cpu`, `cuda`, `auto`).
+* `--dry-run`: Run in dry-run verification mode (1 epoch, batch size 2, minimal image size).
 
 ### 2. Inference / Prediction Skeleton
 [predict.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/predict.py) runs object detection on target image inputs.

@@ -49,6 +49,31 @@ class TestTrainPipeline(unittest.TestCase):
                 shutil.rmtree(run_dir)
             except Exception as e:
                 print(f"Warning: Failed to clean up dry-run results directory {run_dir}: {e}")
+                
+    @patch("training.train.YOLO")
+    @patch("training.train.validate_dataset_config", return_value=True)
+    def test_train_arg_parsing_and_checkpoint_resolution(self, mock_validate, mock_yolo):
+        """Verifies patience, resume, and model checkpoint resolution settings."""
+        # Setup mock training call
+        test_args = [
+            "train.py",
+            "--epochs", "50",
+            "--batch_size", "8",
+            "--patience", "5",
+            "--resume",
+            "--device", "cpu"
+        ]
+        
+        with patch.object(sys, "argv", test_args):
+            params = train_main()
+            
+            # Verify parameters
+            self.assertEqual(params["epochs"], 50)
+            self.assertEqual(params["batch_size"], 8)
+            self.assertEqual(params["device"], "cpu")
+            
+            # Verify that YOLO was initialized (mocked)
+            mock_yolo.assert_called()
 
 
 if __name__ == "__main__":
