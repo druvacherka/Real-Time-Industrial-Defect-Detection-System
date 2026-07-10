@@ -99,12 +99,19 @@ def main():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
             bufsize=1
         )
         
         # Print output to logs in real-time
         for line in process.stdout:
-            print(line.rstrip())
+            try:
+                print(line.rstrip())
+            except UnicodeEncodeError:
+                # Fallback to replacing unencodable characters for the terminal
+                out_enc = sys.stdout.encoding or "utf-8"
+                cleaned = line.encode(out_enc, errors="replace").decode(out_enc)
+                print(cleaned.rstrip())
             
         process.wait()
         

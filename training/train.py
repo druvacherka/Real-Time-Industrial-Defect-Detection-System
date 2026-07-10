@@ -158,6 +158,7 @@ def main():
     
     # 3. Initialize YOLOv8 Model
     model_name = f"{model_arch}.pt"
+    run_name = f"train_{model_arch}"
     checkpoint_path = results_dir / run_name / "weights" / "last.pt"
     
     if resume and checkpoint_path.exists():
@@ -188,7 +189,6 @@ def main():
     # 5. Invoke YOLOv8 Model Training Loop
     logger.info("Starting YOLOv8 training execution...")
     project_name = config["project"].get("name", "Real-Time Industrial Defect Detection")
-    run_name = f"train_{model_arch}"
     
     try:
         # Run training
