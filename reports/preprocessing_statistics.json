@@ -1,10 +1,24 @@
 {
-  "timestamp": "2026-07-09 19:58:24",
+  "timestamp": "2026-07-10 15:02:27",
   "target_size": [
     640,
     640
   ],
-  "normalize": true,
+  "interpolation": "linear",
+  "normalization": {
+    "enabled": true,
+    "type": "min_max",
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
   "save_format": ".png",
   "total_processed": 2649,
   "total_skipped": 0,
@@ -26,8 +40,8 @@
     }
   },
   "timing": {
-    "mean_ms": 21.11,
-    "median_ms": 19.0,
-    "total_seconds": 55.91
+    "mean_ms": 47.28,
+    "median_ms": 46.53,
+    "total_seconds": 125.23
   }
 }

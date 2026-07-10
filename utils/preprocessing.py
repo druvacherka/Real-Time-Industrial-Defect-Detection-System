@@ -1,6 +1,8 @@
 """
 Image Preprocessing Utilities
 =============================
+Real-Time Industrial Defect Detection System
+
 Modular, reusable functions for checking, resizing, normalising,
 and saving images for YOLO defect detection.
 """
@@ -8,7 +10,6 @@ and saving images for YOLO defect detection.
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -42,13 +43,14 @@ def read_and_validate_image(img_path: Path) -> np.ndarray | None:
         return None
 
 
-def resize_image(image: np.ndarray, target_size: Tuple[int, int]) -> np.ndarray:
+def resize_image(image: np.ndarray, target_size: Tuple[int, int], interpolation: int = cv2.INTER_LINEAR) -> np.ndarray:
     """
     Resize image to the specified width and height.
     
     Args:
         image: Input image array.
         target_size: Desired width and height as a tuple (width, height).
+        interpolation: OpenCV interpolation mode.
         
     Returns:
         Resized image array.
@@ -56,28 +58,54 @@ def resize_image(image: np.ndarray, target_size: Tuple[int, int]) -> np.ndarray:
     h, w = image.shape[:2]
     if (w, h) == target_size:
         return image
-    return cv2.resize(image, target_size, interpolation=cv2.INTER_LINEAR)
+    return cv2.resize(image, target_size, interpolation=interpolation)
 
 
-def normalize_image_pixels(image: np.ndarray) -> np.ndarray:
+def normalize_image_pixels(
+    image: np.ndarray,
+    norm_type: str = "min_max",
+    mean: List[float] | None = None,
+    std: List[float] | None = None
+) -> np.ndarray:
     """
-    Normalise pixel values from uint8 [0, 255] to float32 [0.0, 1.0].
+    Normalise pixel values using min-max scaling or z-score standardization.
     
     Args:
-        image: BGR or Grayscale input image.
+        image: BGR input image.
+        norm_type: "min_max", "imagenet", or "standard".
+        mean: Mean values per channel.
+        std: Std values per channel.
         
     Returns:
         Normalised float32 image array.
     """
-    return image.astype(np.float32) / 255.0
+    # 1. Base min-max scaling to [0.0, 1.0]
+    img = image.astype(np.float32) / 255.0
+
+    if norm_type in ("imagenet", "standard"):
+        if mean is None:
+            mean = [0.485, 0.456, 0.406]
+        if std is None:
+            std = [0.229, 0.224, 0.225]
+        
+        mean_arr = np.array(mean, dtype=np.float32)
+        std_arr = np.array(std, dtype=np.float32)
+        
+        # Adjust for BGR/RGB: standard OpenCV loads BGR, but models often expect RGB.
+        # However, let's keep array order matching image channels.
+        if img.ndim == 3 and img.shape[2] == 3:
+            img = (img - mean_arr) / std_arr
+
+    return img
 
 
 def preprocess_and_save(
     img_path: Path,
     output_path: Path,
     target_size: Tuple[int, int],
-    normalize: bool,
-    save_format: str
+    normalize_config: Dict[str, Any],
+    save_format: str,
+    interpolation_mode: int = cv2.INTER_LINEAR
 ) -> bool:
     """
     Load, resize, optionally normalize, and save an image.
@@ -86,8 +114,9 @@ def preprocess_and_save(
         img_path: Source image file path.
         output_path: Destination file path.
         target_size: (width, height) target dimensions.
-        normalize: If True, normalize pixel values to [0.0, 1.0].
+        normalize_config: Dictionary with 'enabled', 'type', 'mean', and 'std'.
         save_format: Target suffix (e.g. '.png', '.npy', '.jpg').
+        interpolation_mode: OpenCV interpolation identifier.
         
     Returns:
         True if the image was processed and saved successfully, False otherwise.
@@ -96,17 +125,27 @@ def preprocess_and_save(
     if img is None:
         return False
         
-    img = resize_image(img, target_size)
+    img = resize_image(img, target_size, interpolation=interpolation_mode)
     
-    if normalize and save_format == ".npy":
-        img = normalize_image_pixels(img)
+    # Process normalization
+    norm_enabled = normalize_config.get("enabled", True)
+    norm_type = normalize_config.get("type", "min_max")
+    mean = normalize_config.get("mean", [0.485, 0.456, 0.406])
+    std = normalize_config.get("std", [0.229, 0.224, 0.225])
+
+    if norm_enabled:
+        img = normalize_image_pixels(img, norm_type, mean, std)
         
     try:
+        # If float32 normalization was applied and saving to .png/jpg, we need to convert back
+        # or use .npy for true floating point arrays.
         if save_format == ".npy":
             np.save(str(output_path.with_suffix(".npy")), img)
         else:
             if img.dtype == np.float32:
-                img = (img * 255).astype(np.uint8)
+                # Denormalize for image display if requested format is image file
+                img = (img * 255.0)
+                img = np.clip(img, 0, 255).astype(np.uint8)
             cv2.imwrite(str(output_path), img)
         return True
     except Exception as exc:

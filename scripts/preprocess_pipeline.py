@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
-Image Preprocessing Pipeline (Refactored)
-========================================
+Optimized Image Preprocessing Pipeline
+======================================
 Real-Time Industrial Defect Detection System
 
-Production pipeline for:
-  - Resizing images to uniform dimensions
-  - Normalizing pixel values
-  - Skipping corrupted files
-  - Saving processed images
-  - Generating preprocessing statistics
-
-Utilizes the modular preprocessing helpers in utils.preprocessing.
-Generates reports/preprocessing_statistics.json.
+Production pipeline utilizing ProcessPoolExecutor to perform parallelized:
+  - Configurable resizing of images to uniform dimensions
+  - Flexible pixel normalization strategies (min-max, ImageNet, etc.)
+  - Verification and filtering of corrupted files
+  - Saving processed outputs (supporting .png or .npy formats)
+  - Detailed performance metrics and statistics generation.
 """
 
 from __future__ import annotations
@@ -22,9 +19,13 @@ import json
 import logging
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
+import yaml
+import cv2
 
 # Bootstrap path resolution
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -38,15 +39,16 @@ from scripts.config import (
     REPORTS_DIR,
     LOGS_DIR,
     SPLITS,
-    TARGET_SIZE,
     IMAGE_EXTENSIONS,
     ensure_dirs,
 )
 from utils.preprocessing import preprocess_and_save
 
-# Initialize logging
+# Setup report & logs dirs
 ensure_dirs(LOGS_DIR, REPORTS_DIR)
-logger = logging.getLogger("preprocessing")
+
+# Initialize logging
+logger = logging.getLogger("preprocessing_pipeline")
 logger.setLevel(logging.INFO)
 
 if logger.handlers:
@@ -64,22 +66,91 @@ ch = logging.StreamHandler(sys.stdout)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+# Configuration mapping for OpenCV interpolation
+INTERPOLATION_MAP = {
+    "linear": cv2.INTER_LINEAR,
+    "cubic": cv2.INTER_CUBIC,
+    "area": cv2.INTER_AREA,
+    "lanczos": cv2.INTER_LANCZOS4,
+}
+
+
+def load_preprocessing_config() -> Dict[str, Any]:
+    """
+    Load settings from configs/preprocessing.yaml.
+    """
+    config_path = _PROJECT_ROOT / "configs" / "preprocessing.yaml"
+    default_config = {
+        "target_size": [640, 640],
+        "interpolation": "linear",
+        "normalization": {
+            "enabled": True,
+            "type": "min_max",
+            "mean": [0.485, 0.456, 0.406],
+            "std": [0.229, 0.224, 0.225]
+        },
+        "num_workers": 4,
+        "save_format": ".png"
+    }
+    
+    if not config_path.exists():
+        logger.warning("configs/preprocessing.yaml not found. Using default configurations.")
+        return default_config
+        
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            user_config = yaml.safe_load(f) or {}
+            # Merge dictionary safely
+            for k, v in user_config.items():
+                if isinstance(v, dict) and k in default_config:
+                    default_config[k].update(v)  # type: ignore
+                else:
+                    default_config[k] = v  # type: ignore
+    except Exception as exc:
+        logger.error("Failed to load configs/preprocessing.yaml: %s. Falling back to defaults.", exc)
+        
+    return default_config
+
+
+def process_single_image_worker(
+    img_path: Path,
+    out_path: Path,
+    target_size: Tuple[int, int],
+    normalize_config: Dict[str, Any],
+    save_format: str,
+    interpolation_mode: int
+) -> Tuple[str, bool, float]:
+    """
+    Worker function to process a single image. Returns (filename, success, elapsed_time).
+    """
+    start_time = time.time()
+    success = preprocess_and_save(
+        img_path,
+        out_path,
+        target_size,
+        normalize_config,
+        save_format,
+        interpolation_mode
+    )
+    elapsed = time.time() - start_time
+    return img_path.name, success, elapsed
+
 
 class PreprocessingPipeline:
-    """End-to-end image preprocessing pipeline coordinator."""
+    """Multi-processed image preprocessing pipeline coordinator."""
 
-    def __init__(
-        self,
-        input_dir: Path = INPUT_DIR,
-        output_dir: Path = OUTPUT_DIR,
-        normalize: bool = True,
-        save_format: str = ".png",
-    ) -> None:
-        self.input_dir = input_dir
-        self.output_dir = output_dir
-        self.target_size = TARGET_SIZE
-        self.normalize = normalize
-        self.save_format = save_format
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.config = config
+        self.input_dir = INPUT_DIR
+        self.output_dir = OUTPUT_DIR
+        
+        # Load params from config
+        self.target_size = tuple(self.config.get("target_size", [640, 640]))
+        self.interpolation_str = self.config.get("interpolation", "linear")
+        self.interpolation_mode = INTERPOLATION_MAP.get(self.interpolation_str, cv2.INTER_LINEAR)
+        self.normalize_config = self.config.get("normalization", {"enabled": True, "type": "min_max"})
+        self.save_format = self.config.get("save_format", ".png")
+        self.num_workers = int(self.config.get("num_workers", 4))
 
         # Statistics tracker
         self.stats = {
@@ -95,12 +166,12 @@ class PreprocessingPipeline:
             (self.output_dir / split).mkdir(parents=True, exist_ok=True)
 
     def process_split(self, split: str) -> None:
-        """Process all images in a given split directory."""
+        """Process all images in a given split directory using process pool."""
         in_split_dir = self.input_dir / split
         out_split_dir = self.output_dir / split
 
         if not in_split_dir.exists():
-            logger.info("  [%s] Input split dir not found, skipping", split.upper())
+            logger.info("  [%s] Input split directory not found, skipping", split.upper())
             return
 
         img_files = sorted([
@@ -108,27 +179,44 @@ class PreprocessingPipeline:
             if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS
         ])
 
+        if not img_files:
+            logger.info("  [%s] No images found to preprocess", split.upper())
+            return
+
         processed = 0
         skipped = 0
+        
+        logger.info("  [%s] Submitting %d images to ProcessPoolExecutor (workers=%d)...", 
+                    split.upper(), len(img_files), self.num_workers)
 
+        # Prepare worker task parameters
+        tasks = []
         for img_path in img_files:
             out_path = out_split_dir / f"{img_path.stem}{self.save_format}"
-            
-            start_time = time.time()
-            success = preprocess_and_save(
+            tasks.append((
                 img_path,
                 out_path,
                 self.target_size,
-                self.normalize,
-                self.save_format
-            )
-            elapsed = time.time() - start_time
+                self.normalize_config,
+                self.save_format,
+                self.interpolation_mode
+            ))
+
+        # Run concurrently
+        with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = [executor.submit(process_single_image_worker, *t) for t in tasks]
             
-            if success:
-                processed += 1
-                self.stats["processing_times"].append(elapsed)
-            else:
-                skipped += 1
+            for future in futures:
+                try:
+                    name, success, elapsed = future.result()
+                    if success:
+                        processed += 1
+                        self.stats["processing_times"].append(elapsed)
+                    else:
+                        skipped += 1
+                except Exception as exc:
+                    logger.error("Error occurred in preprocessing worker: %s", exc)
+                    skipped += 1
 
         self.stats["per_split"][split] = {
             "processed": processed,
@@ -137,27 +225,29 @@ class PreprocessingPipeline:
         }
         
         logger.info(
-            "  [%s] Processed: %d | Skipped: %d / %d",
+            "  [%s] Preprocessing stats — Processed: %d | Skipped: %d / %d",
             split.upper(), processed, skipped, len(img_files)
         )
 
     def save_stats(self) -> Path:
         """Save pipeline stats to reports/preprocessing_statistics.json."""
+        ensure_dirs(REPORTS_DIR)
         report_path = REPORTS_DIR / "preprocessing_statistics.json"
         
         times = self.stats["processing_times"]
         summary = {
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "target_size": list(self.target_size),
-            "normalize": self.normalize,
+            "interpolation": self.interpolation_str,
+            "normalization": self.normalize_config,
             "save_format": self.save_format,
             "total_processed": self.stats["total_processed"],
             "total_skipped": self.stats["total_skipped"],
             "per_split": self.stats["per_split"],
             "timing": {
-                "mean_ms": round(np.mean(times) * 1000, 2) if times else 0,
-                "median_ms": round(np.median(times) * 1000, 2) if times else 0,
-                "total_seconds": round(sum(times), 2) if times else 0,
+                "mean_ms": round(float(np.mean(times)) * 1000, 2) if times else 0.0,
+                "median_ms": round(float(np.median(times)) * 1000, 2) if times else 0.0,
+                "total_seconds": round(float(sum(times)), 2) if times else 0.0,
             }
         }
         
@@ -166,10 +256,53 @@ class PreprocessingPipeline:
             
         return report_path
 
+    def generate_augmentation_summary(self) -> None:
+        """
+        Generate a markdown summary report of the preprocessing step.
+        """
+        summary_md_path = REPORTS_DIR / "preprocessing_validation_summary.md"
+        lines = [
+            "# Preprocessing Pipeline Run Summary",
+            "",
+            f"**Execution Timestamp**: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"**Image Dimensions**: {self.target_size[0]}x{self.target_size[1]} ({self.interpolation_str} interpolation)",
+            f"**Normalization Mode**: {self.normalize_config.get('type', 'min_max')} (enabled={self.normalize_config.get('enabled', True)})",
+            f"**Output Format**: `{self.save_format}`",
+            "",
+            "## 1. Processed Split Counts",
+            "",
+            "| Split | Total Input | Preprocessed Successfully | Skipped (Corrupt) |",
+            "| --- | --- | --- | --- |",
+        ]
+        
+        for split, metrics in self.stats["per_split"].items():
+            lines.append(f"| {split.capitalize()} | {metrics['total']} | {metrics['processed']} | {metrics['skipped']} |")
+            
+        lines.append("")
+        
+        times = self.stats["processing_times"]
+        mean_ms = round(float(np.mean(times)) * 1000, 2) if times else 0.0
+        total_sec = round(float(sum(times)), 2) if times else 0.0
+
+        lines.extend([
+            "## 2. Performance Summary",
+            "",
+            f"- **Concurrency Level**: {self.num_workers} Parallel Processes",
+            f"- **Mean Processing Speed**: {mean_ms} ms per image",
+            f"- **Total Time Spent**: {total_sec} seconds",
+            "",
+            "---",
+            "*Report generated automatically by `preprocess_pipeline.py`.*"
+        ])
+
+        with open(summary_md_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        logger.info("Successfully generated preprocessing validation summary markdown: %s", summary_md_path)
+
     def run(self) -> None:
         """Run full preprocessing pipeline."""
         logger.info("=" * 60)
-        logger.info("STARTING PREPROCESSING PIPELINE")
+        logger.info("STARTING OPTIMIZED PREPROCESSING PIPELINE (CONCURRENT)")
         logger.info("=" * 60)
 
         start_time = time.time()
@@ -182,10 +315,12 @@ class PreprocessingPipeline:
         self.stats["total_skipped"] = sum(s["skipped"] for s in self.stats["per_split"].values())
 
         report_path = self.save_stats()
+        self.generate_augmentation_summary()
+        
         elapsed = time.time() - start_time
 
         logger.info("=" * 60)
-        logger.info("PREPROCESSING PIPELINE COMPLETE in %.2fs", elapsed)
+        logger.info("OPTIMIZED PREPROCESSING PIPELINE COMPLETE in %.2fs", elapsed)
         logger.info("  Processed: %d", self.stats["total_processed"])
         logger.info("  Skipped:   %d", self.stats["total_skipped"])
         logger.info("  Stats Report: %s", report_path)
@@ -193,16 +328,19 @@ class PreprocessingPipeline:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Image Preprocessing Pipeline.")
+    parser = argparse.ArgumentParser(description="Run Optimized Parallel Preprocessing Pipeline.")
     parser.add_argument(
-        "--no-norm",
-        action="store_false",
-        dest="normalize",
-        help="Disable float normalization."
+        "--workers",
+        type=int,
+        help="Number of workers (processes) to run concurrently."
     )
     args = parser.parse_args()
 
-    pipeline = PreprocessingPipeline(normalize=args.normalize)
+    config = load_preprocessing_config()
+    if args.workers:
+        config["num_workers"] = args.workers
+
+    pipeline = PreprocessingPipeline(config)
     pipeline.run()
 
 
