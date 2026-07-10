@@ -128,7 +128,7 @@ pip install -r requirements.txt
 
 ### 2. Run the Data Pipeline
 
-Prepare, balance, and validate the dataset using the automated script pipeline:
+Prepare, inspect, balance, preprocess, and analyze the dataset using the script pipeline:
 
 ```bash
 # Step 1: Verify raw dataset integrity
@@ -136,18 +136,21 @@ python scripts/verify_raw_dataset.py
  
 # Step 2: Convert VOC XML to YOLO TXT format and split
 python scripts/convert_to_yolo.py
+
+# Step 3: Run automated dataset quality inspection (generates reports/quality/dataset_quality_report.md)
+python scripts/inspect_dataset_quality.py
  
-# Step 3: Run comprehensive pair and annotation validation (generates reports/dataset_validation_report.md)
+# Step 4: Run comprehensive pair and annotation validation (generates reports/dataset_validation_report.md)
 python scripts/verify_dataset.py
- 
-# Step 4: Balance class distribution using Albumentations offline augmentation (generates reports/dataset_balancing_report.md)
+  
+# Step 5: Balance class distribution using Albumentations offline augmentation (generates reports/dataset_balancing_report.md)
 python scripts/augment_dataset.py
 
-# Step 5: Preprocess split images (resizing, normalising, corruption check)
+# Step 6: Preprocess split images concurrently (resizing, normalising, corruption check)
 python scripts/preprocess_pipeline.py
 
-# Step 6: Generate dataset statistics and visualization graphs (generates reports/dataset_statistics_report.md)
-python scripts/dataset_stats.py
+# Step 7: Generate dataset analytics dashboard and visualizations (generates reports/analytics/dataset_analytics_report.md)
+python scripts/generate_dataset_dashboard.py
 ```
 
 ### 3. Model Training & Evaluation

@@ -1,6 +1,6 @@
 # NEU Metal Surface Defects — Dataset Documentation
 
-> **Last updated:** 2026-07-07  
+> **Last updated:** 2026-07-10  
 > **Author:** saniyamirjanavar-hash
 
 ---
@@ -39,13 +39,13 @@ dataset/
 ├── raw/               # Original NEU-DET images + Pascal VOC XMLs
 ├── yolo/              # Final YOLO-format split (training-ready)
 │   ├── images/
-│   │   ├── train/    # 1,931 images (orig + augmented)
-│   │   ├── val/      #   361 images
-│   │   └── test/     #   181 images
+│   │   ├── train/    # Images (orig + augmented)
+│   │   ├── val/      # Images
+│   │   └── test/     # Images
 │   └── labels/
-│       ├── train/    # 1,931 .txt label files
-│       ├── val/      #   361 .txt label files
-│       └── test/     #   181 .txt label files
+│       ├── train/    # .txt label files
+│       ├── val/      # .txt label files
+│       └── test/     # .txt label files
 ├── processed/         # Resized / normalized copies (640×640)
 └── augmented/         # Raw augmented output (before YOLO merge)
 ```
@@ -67,53 +67,28 @@ All values are normalized to `[0.0, 1.0]` relative to image dimensions.
 - **10 %** → `test/`  (180 images)
 - Split uses `random.seed(42)` for full reproducibility.
 
-### 3. Class Balancing via Albumentations (`scripts/augment_dataset.py`)
-Minority classes in the training split are augmented until every class reaches the majority count. Transforms applied:
+### 3. Dataset Quality Inspection (`scripts/inspect_dataset_quality.py`)
+Runs comprehensive validation on the dataset to detect:
+- Corrupted or unreadable images.
+- Duplicate images based on MD5 checksums.
+- Missing labels or missing images.
+- Annotation consistency including class ID bounds and coordinate validation.
+Outputs a quality inspection report to `reports/quality/dataset_quality_report.md`.
 
-| Category | Transform | Probability |
-|----------|-----------|-------------|
-| Spatial | Horizontal Flip | 0.5 |
-| Spatial | Vertical Flip | 0.5 |
-| Spatial | Rotate (±90°) | 0.5 |
-| Spatial | Shift-Scale-Rotate | 0.4 |
-| Pixel | Random Brightness + Contrast | 0.5 |
-| Pixel | Hue-Saturation-Value | 0.4 |
-| Pixel | CLAHE | 0.4 |
-| Blur | Gaussian Blur | 0.3 |
-| Blur | Motion Blur | 0.25 |
+### 4. Class Balancing via Albumentations (`scripts/augment_dataset.py`)
+Minority classes in the training split are augmented until every class reaches the majority count.
 
-Augmented files are named `aug_<original_stem>_<idx>.jpg`.
+### 5. Parallel Preprocessing (`scripts/preprocess_pipeline.py`)
+- High-speed resizing to **640 × 640** utilizing Python's `ProcessPoolExecutor`.
+- Supports configurable image normalization including `min_max`, `imagenet`, and Z-score standardization.
+- Saves stats to `reports/preprocessing_statistics.json` and a markdown summary to `reports/preprocessing_validation_summary.md`.
 
-### 4. Preprocessing (`scripts/preprocess_pipeline.py`)
-- Resize to **640 × 640** using `INTER_AREA` (downscale) / `INTER_LINEAR` (upscale)
-- Optional pixel normalization to `[0.0, 1.0]`
-- Corrupted image detection and removal
-
-### 5. Validation (`scripts/validate_pairs.py`)
-- Image readability check (OpenCV)
-- YOLO format: 5 fields per annotation line
-- Class ID in `[0, 5]`
-- Bbox coordinates in `[0.0, 1.0]`
-- Positive width and height
-- Orphan image / label detection
-
-### 6. Preprocessing Report (`scripts/optimize_preprocess.py`)
-- Duplicate image detection (MD5 hash)
-- Float class ID normalization: `0.0` → `0`
-- Outputs `reports/preprocessing_validation_summary.md`
-
----
-
-## Final Dataset Counts
-
-| Split | Images | Labels |
-|-------|--------|--------|
-| Train | 1,931  | 1,931  |
-| Val   |   361  |   361  |
-| Test  |   181  |   181  |
-| **Total** | **2,473** | **2,473** |
-
-> Train includes augmented samples (`aug_*` prefix) to balance minority classes.
+### 6. Analytics Dashboard (`scripts/generate_dataset_dashboard.py`)
+- Computes overall dataset statistics.
+- Computes bounding box dimensions, aspect ratio statistics, and box densities.
+- Generates side-by-side distribution charts and split pie charts.
+- Overlays ground-truth annotations on random samples from each split.
+- Outputs files to `reports/analytics/`.
 
 ---
 
@@ -122,33 +97,10 @@ Augmented files are named `aug_<original_stem>_<idx>.jpg`.
 | File | Purpose |
 |------|---------|
 | `configs/data.yaml` | YOLOv8 dataset config (paths + class names) |
+| `configs/preprocessing.yaml` | Image resizing and normalization parameters |
 | `configs/augmentation.yaml` | Albumentations pipeline parameters |
 | `configs/hyperparameters.yaml` | YOLOv8 training hyperparameters |
 | `configs/experiment.yaml` | Experiment tracking config |
-
----
-
-## Running the Pipeline
-
-```bash
-# 1. Verify raw dataset integrity
-python scripts/verify_raw_dataset.py
-
-# 2. Convert VOC XML → YOLO (first-time only)
-python scripts/convert_to_yolo.py
-
-# 3. Run comprehensive validation suite
-python scripts/verify_dataset.py
-
-# 4. Balance minority classes using Albumentations offline augmentation
-python scripts/augment_dataset.py
-
-# 5. Run image preprocessing (resizing and normalization)
-python scripts/preprocess_pipeline.py
-
-# 6. Generate dataset statistics and charts
-python scripts/dataset_stats.py
-```
 
 ---
 
@@ -156,10 +108,11 @@ python scripts/dataset_stats.py
 
 | Report | Location |
 |--------|----------|
-| Dataset validation | `reports/dataset_validation_report.md` |
-| Dataset balancing | `reports/dataset_balancing_report.md` |
+| Dataset Quality Inspection | `reports/quality/dataset_quality_report.md` |
+| Dataset Balancing | `reports/dataset_balancing_report.md` |
 | Preprocessing statistics | `reports/preprocessing_statistics.json` |
-| Dataset statistics | `reports/dataset_statistics_report.md` |
-| Class distribution chart | `reports/visualizations/class_distribution.png` |
-| Dataset split chart | `reports/visualizations/dataset_split.png` |
-| Image sample visualizations | `reports/visualizations/sample_*.jpg` |
+| Preprocessing validation | `reports/preprocessing_validation_summary.md` |
+| Dataset Analytics Dashboard | `reports/analytics/dataset_analytics_report.md` |
+| Class distribution chart | `reports/analytics/class_distribution_dashboard.png` |
+| Dataset split chart | `reports/analytics/dataset_split_dashboard.png` |
+| Image sample visualizations | `reports/analytics/sample_*.jpg` |
