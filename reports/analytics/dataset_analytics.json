@@ -1,0 +1,97 @@
+{
+  "stats": {
+    "splits": {
+      "train": {
+        "total_images": 2109,
+        "total_labels": 2109,
+        "total_annotations": 4579,
+        "class_distribution": {
+          "0": 782,
+          "1": 762,
+          "2": 742,
+          "3": 741,
+          "4": 775,
+          "5": 777
+        },
+        "class_images": {
+          "0": 333,
+          "1": 312,
+          "2": 307,
+          "3": 528,
+          "4": 373,
+          "5": 414
+        }
+      },
+      "val": {
+        "total_images": 360,
+        "total_labels": 360,
+        "total_annotations": 832,
+        "class_distribution": {
+          "0": 129,
+          "1": 204,
+          "2": 184,
+          "3": 92,
+          "4": 118,
+          "5": 105
+        },
+        "class_images": {
+          "0": 60,
+          "1": 75,
+          "2": 70,
+          "3": 60,
+          "4": 60,
+          "5": 60
+        }
+      },
+      "test": {
+        "total_images": 180,
+        "total_labels": 180,
+        "total_annotations": 441,
+        "class_distribution": {
+          "0": 65,
+          "1": 117,
+          "2": 91,
+          "3": 47,
+          "4": 72,
+          "5": 49
+        },
+        "class_images": {
+          "0": 30,
+          "1": 42,
+          "2": 35,
+          "3": 30,
+          "4": 30,
+          "5": 30
+        }
+      }
+    },
+    "overall": {
+      "total_images": 2649,
+      "total_labels": 2649,
+      "total_annotations": 5852,
+      "class_distribution": {
+        "0": 976,
+        "1": 1083,
+        "2": 1017,
+        "3": 880,
+        "4": 965,
+        "5": 931
+      },
+      "class_images": {
+        "0": 423,
+        "1": 429,
+        "2": 412,
+        "3": 618,
+        "4": 463,
+        "5": 504
+      }
+    }
+  },
+  "bbox_stats": {
+    "mean_width": 0.40215792139439505,
+    "mean_height": 0.502092220608339,
+    "mean_aspect_ratio": 1.1756740066603264,
+    "std_width": 0.27834173984630867,
+    "std_height": 0.2881540538428428
+  }
+}
