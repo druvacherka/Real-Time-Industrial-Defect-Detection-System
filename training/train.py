@@ -91,6 +91,16 @@ def main():
         action="store_true",
         help="Run in dry-run mode (1 epoch, batch size 2, minimal workers)."
     )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        help="Override training early stopping patience epochs."
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume training from the last saved checkpoint."
+    )
     
     args = parser.parse_args()
     
@@ -110,6 +120,8 @@ def main():
     model_arch = args.model if args.model is not None else config["model"].get("architecture", "yolov8n")
     optimizer = config["training"].get("optimizer", "SGD")
     workers = config["training"].get("workers", 4)
+    patience = args.patience if args.patience is not None else config["training"].get("patience", 10)
+    resume = args.resume if args.resume else config["training"].get("resume", False)
     
     # 2. Determine device
     device_arg = args.device if args.device is not None else config["hardware"].get("device", "cpu")
@@ -146,10 +158,20 @@ def main():
     
     # 3. Initialize YOLOv8 Model
     model_name = f"{model_arch}.pt"
-    logger.info(f"Initializing YOLO model: {model_name}")
+    checkpoint_path = results_dir / run_name / "weights" / "last.pt"
+    
+    if resume and checkpoint_path.exists():
+        logger.info(f"Resuming training from checkpoint: {checkpoint_path}")
+        model_load_path = str(checkpoint_path)
+    else:
+        if resume:
+            logger.warning(f"Resume requested but checkpoint {checkpoint_path} not found. Starting training from scratch.")
+            resume = False
+        model_load_path = model_name
+        logger.info(f"Initializing YOLO model from base weights: {model_load_path}")
+        
     try:
-        # Load a pretrained model if set, otherwise initialize a new model
-        model = YOLO(model_name)
+        model = YOLO(model_load_path)
         logger.info("YOLO model initialized successfully.")
     except Exception as e:
         logger.error(f"Error initializing YOLO model: {e}")
@@ -180,6 +202,8 @@ def main():
             name=run_name,
             optimizer=optimizer,
             workers=workers,
+            patience=patience,
+            resume=resume,
             exist_ok=True
         )
         logger.info("YOLOv8 training completed successfully.")
