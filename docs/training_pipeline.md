@@ -86,6 +86,32 @@ This runs evaluation sequentially on both splits and generates a detailed compar
 
 ---
 
+## 🚀 YOLOv8 Baseline Model Training (Week 2, Day 2)
+
+### Baseline Training Execution
+Due to running on CPU without hardware acceleration, the baseline YOLOv8 model training is executed as a lightweight, fast-converging 5-epoch run with a smaller input resolution of 128x128. This produces valid baseline model weights (`best.pt`) and allows us to verify the training pipelines end-to-end.
+
+To execute the baseline training manually:
+```bash
+.\venv\Scripts\python.exe scripts/execute_model_training.py --epochs 5 --batch_size 16 --img_size 128 --device cpu
+```
+
+### Custom Epoch Validation Metrics Callback
+A custom Ultralytics YOLOv8 callback has been integrated into [train.py](file:///c:/Users/druva/projects/Real-Time-Industrial-Defect-Detection-System/training/train.py) that logs epoch-wise training losses and validation metrics (Precision, Recall, mAP50, mAP50-95) explicitly:
+```
+2026-07-11 23:48:54,764 | INFO | Epoch 5/5 - Training Losses: {'box_loss': 1.6849, 'cls_loss': 1.6354, 'dfl_loss': 1.4546}
+2026-07-11 23:48:54,764 | INFO | Epoch 5/5 - Validation Metrics: {'metrics/precision(B)': 0.6146, 'metrics/recall(B)': 0.4108, 'metrics/mAP50(B)': 0.4361, 'metrics/mAP50-95(B)': 0.2038}
+```
+
+### Saved Output Artifacts
+The training run outputs the following files under `results/train_yolov8n/`:
+* `weights/best.pt`: Best-performing baseline model weights.
+* `weights/last.pt`: Last saved checkpoint weights.
+* `results.csv`: Log of loss and validation metrics across all epochs.
+* `loss_curves.png` & `map_curves.png`: Training learning curve visualization plots.
+
+---
+
 ## 🧪 Running Unit Tests
 
 Ensure all tests pass prior to pushing changes:
