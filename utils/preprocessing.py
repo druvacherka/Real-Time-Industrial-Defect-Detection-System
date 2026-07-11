@@ -79,6 +79,11 @@ def normalize_image_pixels(
     Returns:
         Normalised float32 image array.
     """
+    # Convert BGR to RGB if z-score standardization is applied (which is typically RGB-based)
+    if norm_type in ("imagenet", "standard"):
+        if image.ndim == 3 and image.shape[2] == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
     # 1. Base min-max scaling to [0.0, 1.0]
     img = image.astype(np.float32) / 255.0
 
@@ -91,10 +96,10 @@ def normalize_image_pixels(
         mean_arr = np.array(mean, dtype=np.float32)
         std_arr = np.array(std, dtype=np.float32)
         
-        # Adjust for BGR/RGB: standard OpenCV loads BGR, but models often expect RGB.
-        # However, let's keep array order matching image channels.
         if img.ndim == 3 and img.shape[2] == 3:
-            img = (img - mean_arr) / std_arr
+            # Inline fast z-score subtraction and division
+            np.subtract(img, mean_arr, out=img)
+            np.divide(img, std_arr, out=img)
 
     return img
 
