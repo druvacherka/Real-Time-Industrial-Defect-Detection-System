@@ -67,13 +67,14 @@ All values are normalized to `[0.0, 1.0]` relative to image dimensions.
 - **10 %** → `test/`  (180 images)
 - Split uses `random.seed(42)` for full reproducibility.
 
-### 3. Dataset Quality Inspection (`scripts/inspect_dataset_quality.py`)
+### 3. Automated Dataset Health Monitoring (`scripts/monitor_dataset_health.py`)
 Runs comprehensive validation on the dataset to detect:
 - Corrupted or unreadable images.
 - Duplicate images based on MD5 checksums.
 - Missing labels or missing images.
 - Annotation consistency including class ID bounds and coordinate validation.
-Outputs a quality inspection report to `reports/quality/dataset_quality_report.md`.
+- Cross-split stem duplicates (data leakage).
+Outputs a health monitoring report to `reports/dataset_health/dataset_health_report.md`.
 
 ### 4. Class Balancing via Albumentations (`scripts/augment_dataset.py`)
 Minority classes in the training split are augmented until every class reaches the majority count.
@@ -108,6 +109,7 @@ Minority classes in the training split are augmented until every class reaches t
 
 | Report | Location |
 |--------|----------|
+| Dataset Health Report | `reports/dataset_health/dataset_health_report.md` |
 | Dataset Quality Inspection | `reports/quality/dataset_quality_report.md` |
 | Dataset Balancing | `reports/dataset_balancing_report.md` |
 | Preprocessing statistics | `reports/preprocessing_statistics.json` |

@@ -137,19 +137,22 @@ python scripts/verify_raw_dataset.py
 # Step 2: Convert VOC XML to YOLO TXT format and split
 python scripts/convert_to_yolo.py
 
-# Step 3: Run automated dataset quality inspection (generates reports/quality/dataset_quality_report.md)
+# Step 3: Run automated dataset health monitoring (generates reports/dataset_health/dataset_health_report.md)
+python scripts/monitor_dataset_health.py
+
+# Step 4: Run automated dataset quality inspection (generates reports/quality/dataset_quality_report.md)
 python scripts/inspect_dataset_quality.py
  
-# Step 4: Run comprehensive pair and annotation validation (generates reports/dataset_validation_report.md)
+# Step 5: Run comprehensive pair and annotation validation (generates reports/dataset_validation_report.md)
 python scripts/verify_dataset.py
   
-# Step 5: Balance class distribution using Albumentations offline augmentation (generates reports/dataset_balancing_report.md)
+# Step 6: Balance class distribution using Albumentations offline augmentation (generates reports/dataset_balancing_report.md)
 python scripts/augment_dataset.py
 
-# Step 6: Preprocess split images concurrently (resizing, normalising, corruption check)
+# Step 7: Preprocess split images concurrently (resizing, normalising, corruption check)
 python scripts/preprocess_pipeline.py
 
-# Step 7: Generate dataset analytics dashboard and visualizations (generates reports/analytics/dataset_analytics_report.md)
+# Step 8: Generate dataset analytics dashboard and visualizations (generates reports/analytics/dataset_analytics_report.md)
 python scripts/generate_dataset_dashboard.py
 ```
 
