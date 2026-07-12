@@ -1,5 +1,7 @@
 """
 Visualization utilities for defect detection dataset.
+
+Updated on: 2026-07-12 by saniyamirjanavar-hash
 """
 
 import xml.etree.ElementTree as ET
