@@ -1,7 +1,7 @@
 # NEU Metal Surface Defects — Dataset Documentation
 
-> **Last updated:** 2026-07-10  
-> **Author:** saniyamirjanavar-hash
+> **Last updated:** 2026-07-12  
+> **Author:** saniyamirjanavar-hash (Senior Computer Vision & Data Engineer)
 
 ---
 
