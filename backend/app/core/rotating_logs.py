@@ -1,6 +1,8 @@
 """
 Rotating logs configurator to manage file rotation policies.
 Author: prajwaledu802-coder
+
+Optimized for Prometheus monitoring: 2026-07-12
 """
 import logging
 from logging.handlers import RotatingFileHandler
