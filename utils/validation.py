@@ -4,6 +4,8 @@ Dataset Validation Module
 Modular, reusable verification functions for the NEU Metal Surface Defects dataset.
 Contains folder structure checking, image corruption tests, duplicate checks,
 class ID validations, and bounding box checks.
+
+Updated on: 2026-07-12 by saniyamirjanavar-hash
 """
 
 from __future__ import annotations
