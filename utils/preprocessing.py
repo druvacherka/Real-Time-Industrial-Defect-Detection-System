@@ -5,6 +5,8 @@ Real-Time Industrial Defect Detection System
 
 Modular, reusable functions for checking, resizing, normalising,
 and saving images for YOLO defect detection.
+
+Optimized on: 2026-07-12 by saniyamirjanavar-hash
 """
 
 from __future__ import annotations
