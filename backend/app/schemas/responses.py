@@ -3,8 +3,7 @@ API Response Schemas
 =====================
 Pydantic models for structured API responses.
 
-Author: prajwaledu802-coder
-Date: 2026-07-04
+Optimized on: 2026-07-12 by prajwaledu802-coder
 """
 
 from typing import List, Optional
