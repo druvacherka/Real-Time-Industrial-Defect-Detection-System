@@ -5,7 +5,7 @@ Full prediction workflow connecting image upload, preprocessing,
 YOLO inference, and structured JSON response.
 
 Author: prajwaledu802-coder
-Date: 2026-07-05
+Date: 2026-07-12 (Asynchronous Optimization)
 """
 
 import os
