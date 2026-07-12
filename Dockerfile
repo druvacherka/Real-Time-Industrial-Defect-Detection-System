@@ -1,5 +1,6 @@
 # ==============================================================================
 # Dockerfile — Real-Time Industrial Defect Detection System API
+# Optimized for production deployment: 2026-07-12
 # ==============================================================================
 FROM python:3.12-slim
 
