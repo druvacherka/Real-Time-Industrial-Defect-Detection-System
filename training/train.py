@@ -173,7 +173,19 @@ def main():
         
     try:
         model = YOLO(model_load_path)
-        logger.info("YOLO model initialized successfully.")
+        
+        # Add custom callback to log validation metrics at epoch end
+        def log_epoch_metrics(trainer):
+            epoch = trainer.epoch + 1  # 0-indexed in ultralytics
+            loss_dict = {name: float(val) for name, val in zip(trainer.loss_names, trainer.tloss)}
+            logger.info(f"Epoch {epoch}/{trainer.epochs} - Training Losses: {loss_dict}")
+            if hasattr(trainer, "metrics") and trainer.metrics:
+                # Format metrics for clean logging
+                metrics_summary = {k: round(float(v), 4) for k, v in trainer.metrics.items()}
+                logger.info(f"Epoch {epoch}/{trainer.epochs} - Validation Metrics: {metrics_summary}")
+                
+        model.add_callback("on_fit_epoch_end", log_epoch_metrics)
+        logger.info("YOLO model initialized and validation callbacks registered successfully.")
     except Exception as e:
         logger.error(f"Error initializing YOLO model: {e}")
         sys.exit(1)
