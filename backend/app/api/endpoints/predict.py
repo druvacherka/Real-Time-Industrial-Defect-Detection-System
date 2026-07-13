@@ -16,7 +16,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
 
 from app.schemas.responses import (
@@ -72,7 +72,7 @@ def _generate_request_id() -> str:
     return str(uuid.uuid4())[:12]
 
 
-async def _process_image_async(contents: bytes, request_id: str) -> tuple[dict, dict]:
+async def _process_image_async(contents: bytes, request_id: str, conf_threshold: Optional[float] = None) -> tuple[dict, dict]:
     """
     Run CPU-bound image decoding, validation, preprocessing, and inference in a thread pool.
     """
@@ -113,7 +113,7 @@ async def _process_image_async(contents: bytes, request_id: str) -> tuple[dict, 
     # Offload model inference to prevent event loop blocking
     try:
         model_svc = get_model_service()
-        prediction_result = await asyncio.to_thread(model_svc.predict_image, processed_image)
+        prediction_result = await asyncio.to_thread(model_svc.predict_image, processed_image, conf_threshold)
     except Exception as exc:
         logger.error(f"[{request_id}] Inference failed: {exc}")
         raise HTTPException(status_code=500, detail="Model inference failed")
@@ -145,6 +145,13 @@ async def predict_image(
         ...,
         description="Image file to analyze for defects (JPG, JPEG, PNG)",
     ),
+    conf_threshold: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold for detections override",
+        example=0.25,
+    ),
 ):
     """
     End-to-end image defect prediction workflow.
@@ -154,7 +161,7 @@ async def predict_image(
 
     logger.info(
         f"[request_id={request_id}] [action=predict_image] [status=received] "
-        f"filename={file.filename} content_type={file.content_type}"
+        f"filename={file.filename} content_type={file.content_type} conf_threshold={conf_threshold}"
     )
 
     # Step 1 — Validate extension format
@@ -204,7 +211,7 @@ async def predict_image(
     # Step 4 — Run preprocessing and inference concurrently with a 15-second timeout
     try:
         preprocess_result, prediction_result = await asyncio.wait_for(
-            _process_image_async(contents, request_id),
+            _process_image_async(contents, request_id, conf_threshold),
             timeout=15.0
         )
     except asyncio.TimeoutError:
@@ -286,6 +293,13 @@ async def predict_video(
         ...,
         description="Video file to analyze for defects (MP4, AVI, MOV)",
     ),
+    conf_threshold: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold for detections override",
+        example=0.25,
+    ),
 ):
     """
     End-to-end video defect prediction workflow.
@@ -294,59 +308,67 @@ async def predict_video(
     start_time = time.time()
 
     logger.info(
-        f"[{request_id}] Video prediction request received: "
-        f"filename={file.filename}, content_type={file.content_type}"
+        f"[request_id={request_id}] [action=predict_video] [status=received] "
+        f"filename={file.filename} content_type={file.content_type} conf_threshold={conf_threshold}"
     )
 
     # Step 1 — Validate format
     ext = _validate_video_format(file.filename)
 
-    # Step 2 — Read file contents
+    # Step 2 — Read file contents asynchronously
     try:
         contents = await file.read()
     except Exception as exc:
-        logger.error(f"[{request_id}] Failed to read uploaded file: {exc}")
+        logger.error(f"[request_id={request_id}] [action=predict_video] [status=failed] error=read_failed details={exc}")
         raise HTTPException(status_code=500, detail="Failed to read uploaded file")
 
     # Step 3 — Validate file size
     file_size_mb = len(contents) / (1024 * 1024)
     if file_size_mb > MAX_VIDEO_SIZE_MB:
+        logger.warning(f"[request_id={request_id}] [action=predict_video] [status=rejected] reason=file_too_large size_mb={file_size_mb:.2f}")
         raise HTTPException(
             status_code=413,
             detail=f"File size {file_size_mb:.2f} MB exceeds maximum {MAX_VIDEO_SIZE_MB} MB",
         )
     if len(contents) == 0:
+        logger.warning(f"[request_id={request_id}] [action=predict_video] [status=rejected] reason=empty_file")
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    # Step 4 — Save temporarily to disk (OpenCV needs a file path)
+    # Step 4 — Save temporarily to disk asynchronously
     save_filename = f"{request_id}_{file.filename}"
     save_path = UPLOAD_DIR / save_filename
     try:
-        with open(save_path, "wb") as f:
-            f.write(contents)
-        logger.info(f"[{request_id}] Saved video to {save_path}")
-    except IOError as exc:
-        logger.error(f"[{request_id}] Failed to save file: {exc}")
+        await asyncio.to_thread(save_path.write_bytes, contents)
+        logger.info(f"[request_id={request_id}] [action=save_temp_video] [status=success] path={save_path}")
+    except Exception as exc:
+        logger.error(f"[request_id={request_id}] [action=save_temp_video] [status=failed] error={exc}")
         raise HTTPException(status_code=500, detail="Failed to save uploaded file")
 
-    # Step 5 — Run inference
+    # Step 5 — Run inference with 45-second timeout
     try:
         model_svc = get_model_service()
-        prediction_result = model_svc.predict_video(save_path)
+        # Offload CPU-bound frame-by-frame video decoding and inference to thread pool
+        prediction_result = await asyncio.wait_for(
+            asyncio.to_thread(model_svc.predict_video, save_path, conf_threshold),
+            timeout=45.0
+        )
         if prediction_result.get("status") == "error":
             raise ValueError(prediction_result.get("error_message", "Unknown error"))
-        logger.info(f"[{request_id}] Video inference complete")
+        logger.info(f"[request_id={request_id}] [action=predict_video] [status=completed_inference]")
+    except asyncio.TimeoutError:
+        logger.error(f"[request_id={request_id}] [action=predict_video] [status=timeout] timeout_limit=45.0s")
+        raise HTTPException(status_code=504, detail="Video processing request timed out")
     except Exception as exc:
-        logger.error(f"[{request_id}] Video inference failed: {exc}")
+        logger.error(f"[request_id={request_id}] [action=predict_video] [status=failed] error={exc}")
         raise HTTPException(status_code=500, detail=f"Video processing failed: {str(exc)}")
     finally:
         # Clean up video file after processing to save disk space
         if save_path.exists():
             try:
-                os.remove(save_path)
-                logger.info(f"[{request_id}] Cleaned up temp video file {save_path}")
+                await asyncio.to_thread(os.remove, save_path)
+                logger.info(f"[request_id={request_id}] [action=clean_temp_video] [status=success] path={save_path}")
             except Exception as e:
-                logger.warning(f"[{request_id}] Failed to delete temp video file: {e}")
+                logger.warning(f"[request_id={request_id}] [action=clean_temp_video] [status=failed] error={e}")
 
     # Step 6 — Build response
     processing_time = time.time() - start_time

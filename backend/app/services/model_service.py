@@ -54,31 +54,45 @@ class ModelService:
             self.model_wrapper = None
             return False
 
-    def predict_image(self, processed_image: np.ndarray) -> Dict[str, Any]:
+    def predict_image(self, processed_image: np.ndarray, conf_threshold: Optional[float] = None) -> Dict[str, Any]:
         """
-        Run inference on preprocessed image array.
+        Run inference on preprocessed image array with optional confidence threshold override.
         """
         if not self.model_wrapper:
             logger.error("ModelService: predict_image failed (model not loaded)")
             raise RuntimeError("YOLO model is not loaded in memory")
 
-        start_time = time.time()
-        prediction: PredictionResponse = self.model_wrapper.predict(processed_image)
-        duration_ms = (time.time() - start_time) * 1000
+        original_conf = self.model_wrapper.confidence_threshold
+        if conf_threshold is not None:
+            self.model_wrapper.confidence_threshold = conf_threshold
 
-        result = prediction.to_dict()
-        result["status"] = "success"
-        result["inference_service_time"] = f"{duration_ms:.2f} ms"
-        return result
+        try:
+            start_time = time.time()
+            prediction: PredictionResponse = self.model_wrapper.predict(processed_image)
+            duration_ms = (time.time() - start_time) * 1000
 
-    def predict_video(self, video_path: Path) -> Dict[str, Any]:
+            result = prediction.to_dict()
+            result["status"] = "success"
+            result["inference_service_time"] = f"{duration_ms:.2f} ms"
+            return result
+        except Exception as exc:
+            logger.error(f"ModelService: image prediction failed: {exc}")
+            raise RuntimeError(f"Inference engine failure: {str(exc)}")
+        finally:
+            self.model_wrapper.confidence_threshold = original_conf
+
+    def predict_video(self, video_path: Path, conf_threshold: Optional[float] = None) -> Dict[str, Any]:
         """
-        Run inference on video file frame-by-frame using OpenCV.
+        Run inference on video file frame-by-frame using OpenCV with optional confidence threshold override.
         Accumulates detection results across frames.
         """
         if not self.model_wrapper:
             logger.error("ModelService: predict_video failed (model not loaded)")
             raise RuntimeError("YOLO model is not loaded in memory")
+
+        original_conf = self.model_wrapper.confidence_threshold
+        if conf_threshold is not None:
+            self.model_wrapper.confidence_threshold = conf_threshold
 
         start_time = time.time()
         logger.info(f"ModelService: starting video inference pipeline for {video_path}")
@@ -173,7 +187,9 @@ class ModelService:
             }
         except Exception as exc:
             logger.error(f"ModelService: video prediction failed: {exc}")
-            raise
+            raise RuntimeError(f"Video processing/inference engine failure: {str(exc)}")
+        finally:
+            self.model_wrapper.confidence_threshold = original_conf
 
     def unload_model(self) -> None:
         """
