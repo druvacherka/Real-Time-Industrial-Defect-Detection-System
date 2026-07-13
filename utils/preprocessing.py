@@ -113,7 +113,7 @@ def preprocess_and_save(
     normalize_config: Dict[str, Any],
     save_format: str,
     interpolation_mode: int = cv2.INTER_LINEAR
-) -> bool:
+) -> Tuple[bool, Dict[str, float]]:
     """
     Load, resize, optionally normalize, and save an image.
     
@@ -126,13 +126,28 @@ def preprocess_and_save(
         interpolation_mode: OpenCV interpolation identifier.
         
     Returns:
-        True if the image was processed and saved successfully, False otherwise.
+        A tuple of (success_status, metrics_dict).
     """
+    import time
+    metrics = {
+        "read_time": 0.0,
+        "resize_time": 0.0,
+        "normalize_time": 0.0,
+        "save_time": 0.0,
+        "total_time": 0.0
+    }
+    
+    t0 = time.time()
     img = read_and_validate_image(img_path)
+    metrics["read_time"] = time.time() - t0
+    
     if img is None:
-        return False
+        metrics["total_time"] = time.time() - t0
+        return False, metrics
         
+    t1 = time.time()
     img = resize_image(img, target_size, interpolation=interpolation_mode)
+    metrics["resize_time"] = time.time() - t1
     
     # Process normalization
     norm_enabled = normalize_config.get("enabled", True)
@@ -140,9 +155,12 @@ def preprocess_and_save(
     mean = normalize_config.get("mean", [0.485, 0.456, 0.406])
     std = normalize_config.get("std", [0.229, 0.224, 0.225])
 
+    t2 = time.time()
     if norm_enabled:
         img = normalize_image_pixels(img, norm_type, mean, std)
+    metrics["normalize_time"] = time.time() - t2
         
+    t3 = time.time()
     try:
         # If float32 normalization was applied and saving to .png/jpg, we need to convert back
         # or use .npy for true floating point arrays.
@@ -154,7 +172,10 @@ def preprocess_and_save(
                 img = (img * 255.0)
                 img = np.clip(img, 0, 255).astype(np.uint8)
             cv2.imwrite(str(output_path), img)
-        return True
+        metrics["save_time"] = time.time() - t3
+        metrics["total_time"] = time.time() - t0
+        return True, metrics
     except Exception as exc:
         logger.error("Failed to save processed image %s: %s", output_path.name, exc)
-        return False
+        metrics["total_time"] = time.time() - t0
+        return False, metrics

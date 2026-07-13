@@ -119,12 +119,11 @@ def process_single_image_worker(
     normalize_config: Dict[str, Any],
     save_format: str,
     interpolation_mode: int
-) -> Tuple[str, bool, float]:
+) -> Tuple[str, bool, Dict[str, float]]:
     """
-    Worker function to process a single image. Returns (filename, success, elapsed_time).
+    Worker function to process a single image. Returns (filename, success, metrics_dict).
     """
-    start_time = time.time()
-    success = preprocess_and_save(
+    success, metrics = preprocess_and_save(
         img_path,
         out_path,
         target_size,
@@ -132,8 +131,7 @@ def process_single_image_worker(
         save_format,
         interpolation_mode
     )
-    elapsed = time.time() - start_time
-    return img_path.name, success, elapsed
+    return img_path.name, success, metrics
 
 
 class PreprocessingPipeline:
@@ -158,6 +156,10 @@ class PreprocessingPipeline:
             "total_skipped": 0,
             "per_split": {},
             "processing_times": [],
+            "read_times": [],
+            "resize_times": [],
+            "normalize_times": [],
+            "save_times": [],
         }
 
     def setup_dirs(self) -> None:
@@ -208,10 +210,14 @@ class PreprocessingPipeline:
             
             for future in futures:
                 try:
-                    name, success, elapsed = future.result()
+                    name, success, metrics = future.result()
                     if success:
                         processed += 1
-                        self.stats["processing_times"].append(elapsed)
+                        self.stats["processing_times"].append(metrics["total_time"])
+                        self.stats["read_times"].append(metrics["read_time"])
+                        self.stats["resize_times"].append(metrics["resize_time"])
+                        self.stats["normalize_times"].append(metrics["normalize_time"])
+                        self.stats["save_times"].append(metrics["save_time"])
                     else:
                         skipped += 1
                 except Exception as exc:
@@ -235,6 +241,11 @@ class PreprocessingPipeline:
         report_path = REPORTS_DIR / "preprocessing_statistics.json"
         
         times = self.stats["processing_times"]
+        read_t = self.stats["read_times"]
+        resize_t = self.stats["resize_times"]
+        norm_t = self.stats["normalize_times"]
+        save_t = self.stats["save_times"]
+        
         summary = {
             "timestamp": time.strftime('%Y-%m-%d %H:%M:%S'),
             "target_size": list(self.target_size),
@@ -248,6 +259,12 @@ class PreprocessingPipeline:
                 "mean_ms": round(float(np.mean(times)) * 1000, 2) if times else 0.0,
                 "median_ms": round(float(np.median(times)) * 1000, 2) if times else 0.0,
                 "total_seconds": round(float(sum(times)), 2) if times else 0.0,
+                "stages_mean_ms": {
+                    "read": round(float(np.mean(read_t)) * 1000, 2) if read_t else 0.0,
+                    "resize": round(float(np.mean(resize_t)) * 1000, 2) if resize_t else 0.0,
+                    "normalize": round(float(np.mean(norm_t)) * 1000, 2) if norm_t else 0.0,
+                    "save": round(float(np.mean(save_t)) * 1000, 2) if save_t else 0.0,
+                }
             }
         }
         
@@ -261,6 +278,21 @@ class PreprocessingPipeline:
         Generate a markdown summary report of the preprocessing step.
         """
         summary_md_path = REPORTS_DIR / "preprocessing_validation_summary.md"
+        
+        times = self.stats["processing_times"]
+        read_t = self.stats["read_times"]
+        resize_t = self.stats["resize_times"]
+        norm_t = self.stats["normalize_times"]
+        save_t = self.stats["save_times"]
+        
+        mean_ms = round(float(np.mean(times)) * 1000, 2) if times else 0.0
+        total_sec = round(float(sum(times)), 2) if times else 0.0
+        
+        mean_read = round(float(np.mean(read_t)) * 1000, 2) if read_t else 0.0
+        mean_resize = round(float(np.mean(resize_t)) * 1000, 2) if resize_t else 0.0
+        mean_norm = round(float(np.mean(norm_t)) * 1000, 2) if norm_t else 0.0
+        mean_save = round(float(np.mean(save_t)) * 1000, 2) if save_t else 0.0
+
         lines = [
             "# Preprocessing Pipeline Run Summary",
             "",
@@ -280,16 +312,18 @@ class PreprocessingPipeline:
             
         lines.append("")
         
-        times = self.stats["processing_times"]
-        mean_ms = round(float(np.mean(times)) * 1000, 2) if times else 0.0
-        total_sec = round(float(sum(times)), 2) if times else 0.0
-
         lines.extend([
             "## 2. Performance Summary",
             "",
             f"- **Concurrency Level**: {self.num_workers} Parallel Processes",
             f"- **Mean Processing Speed**: {mean_ms} ms per image",
             f"- **Total Time Spent**: {total_sec} seconds",
+            "",
+            "### Stage Timing Breakdown (Mean):",
+            f"- **Read & Validate**: {mean_read} ms",
+            f"- **Resize**: {mean_resize} ms",
+            f"- **Normalization**: {mean_norm} ms",
+            f"- **Save & Format**: {mean_save} ms",
             "",
             "---",
             "*Report generated automatically by `preprocess_pipeline.py`.*"

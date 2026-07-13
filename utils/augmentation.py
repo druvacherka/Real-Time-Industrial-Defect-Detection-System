@@ -49,6 +49,13 @@ def build_augmentation_pipeline(cfg: Dict[str, Any]) -> A.Compose:
             border_mode=sp.get("rotate", {}).get("border_mode", 0),
             p=sp.get("rotate", {}).get("p", 0.5)
         ),
+        A.ShiftScaleRotate(
+            shift_limit=sp.get("shift_scale_rotate", {}).get("shift_limit", 0.0625),
+            scale_limit=sp.get("shift_scale_rotate", {}).get("scale_limit", 0.10),
+            rotate_limit=sp.get("shift_scale_rotate", {}).get("rotate_limit", 45),
+            border_mode=sp.get("shift_scale_rotate", {}).get("border_mode", 0),
+            p=sp.get("shift_scale_rotate", {}).get("p", 0.4)
+        ),
         A.RandomBrightnessContrast(
             brightness_limit=px.get("random_brightness_contrast", {}).get("brightness_limit", 0.3),
             contrast_limit=px.get("random_brightness_contrast", {}).get("contrast_limit", 0.3),
@@ -57,6 +64,10 @@ def build_augmentation_pipeline(cfg: Dict[str, Any]) -> A.Compose:
         A.GaussianBlur(
             blur_limit=tuple(bl.get("gaussian_blur", {}).get("blur_limit", [3, 7])),
             p=bl.get("gaussian_blur", {}).get("p", 0.3)
+        ),
+        A.MotionBlur(
+            blur_limit=bl.get("motion_blur", {}).get("blur_limit", 7),
+            p=bl.get("motion_blur", {}).get("p", 0.25)
         ),
         A.CLAHE(
             clip_limit=px.get("clahe", {}).get("clip_limit", 4.0),
