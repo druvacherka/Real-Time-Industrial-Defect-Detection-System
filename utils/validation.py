@@ -188,6 +188,35 @@ def check_duplicate_images(
     return duplicates
 
 
+def calculate_yolo_iou(box1: List[float], box2: List[float]) -> float:
+    """
+    Calculate Intersection over Union (IoU) of two YOLO bounding boxes (cx, cy, w, h).
+    """
+    cx1, cy1, w1, h1 = box1
+    cx2, cy2, w2, h2 = box2
+    
+    x1_min, x1_max = cx1 - w1 / 2, cx1 + w1 / 2
+    y1_min, y1_max = cy1 - h1 / 2, cy1 + h1 / 2
+    x2_min, x2_max = cx2 - w2 / 2, cx2 + w2 / 2
+    y2_min, y2_max = cy2 - h2 / 2, cy2 + h2 / 2
+    
+    inter_x_min = max(x1_min, x2_min)
+    inter_y_min = max(y1_min, y2_min)
+    inter_x_max = min(x1_max, x2_max)
+    inter_y_max = min(y1_max, y2_max)
+    
+    inter_w = max(0.0, inter_x_max - inter_x_min)
+    inter_h = max(0.0, inter_y_max - inter_y_min)
+    inter_area = inter_w * inter_h
+    
+    area1 = w1 * h1
+    area2 = w2 * h2
+    union_area = area1 + area2 - inter_area
+    if union_area <= 0:
+        return 0.0
+    return inter_area / union_area
+
+
 def validate_annotation_consistency(
     labels_dir: Path,
     splits: List[str],
@@ -196,11 +225,14 @@ def validate_annotation_consistency(
     """
     Check label format, number of elements, numeric type conversion,
     valid class IDs, and bounding-box coordinates constraint in [0, 1].
+    Also checks for overlapping bounding boxes (IoU > 0.90) and extremely small boxes.
     """
     report = {
         "invalid_class_ids": {},
         "out_of_range_coords": {},
         "malformed_lines": {},
+        "overlapping_boxes": {},
+        "small_boxes": {},
         "class_distribution": {},
         "total_annotations_checked": 0,
         "total_errors": 0,
@@ -211,11 +243,15 @@ def validate_annotation_consistency(
     for split in splits:
         lbl_split_dir = labels_dir / split
         if not lbl_split_dir.exists():
+            logger.warning("Labels directory for split '%s' not found: %s", split, lbl_split_dir)
             continue
             
+        logger.info("Scanning annotations in split: %s", split)
         invalid_classes = []
         out_of_range = []
         malformed = []
+        overlapping = []
+        small = []
         
         lbl_files = [
             f for f in lbl_split_dir.iterdir()
@@ -230,6 +266,7 @@ def validate_annotation_consistency(
                 report["total_errors"] += 1
                 continue
                 
+            valid_boxes_in_file = []
             for line_no, line in enumerate(lines, start=1):
                 stripped = line.strip()
                 if not stripped:
@@ -249,6 +286,7 @@ def validate_annotation_consistency(
                     }
                     malformed.append(err)
                     report["total_errors"] += 1
+                    logger.warning("Malformed annotation in %s:%d: Expected 5 elements, got %d", lbl_path.name, line_no, len(parts))
                     continue
                     
                 # Parse types
@@ -264,6 +302,7 @@ def validate_annotation_consistency(
                     }
                     malformed.append(err)
                     report["total_errors"] += 1
+                    logger.warning("Numeric parse error in %s:%d: %s", lbl_path.name, line_no, exc)
                     continue
                     
                 # Validate Class ID
@@ -276,6 +315,7 @@ def validate_annotation_consistency(
                     }
                     invalid_classes.append(err)
                     report["total_errors"] += 1
+                    logger.warning("Invalid Class ID in %s:%d: %d not in %s", lbl_path.name, line_no, cls_id, valid_class_ids)
                 else:
                     class_distribution[cls_id] = class_distribution.get(cls_id, 0) + 1
                     
@@ -299,13 +339,48 @@ def validate_annotation_consistency(
                     }
                     out_of_range.append(err)
                     report["total_errors"] += 1
-                    
+                    logger.warning("Out of range box coordinates in %s:%d: %s", lbl_path.name, line_no, ", ".join(coord_errors))
+                else:
+                    valid_boxes_in_file.append((line_no, cls_id, [cx, cy, bw, bh]))
+
+                # Check for extremely small boxes (e.g. width or height < 0.005)
+                if bw < 0.005 or bh < 0.005:
+                    err = {
+                        "file": lbl_path.name,
+                        "line": line_no,
+                        "bbox": [cx, cy, bw, bh]
+                    }
+                    small.append(err)
+                    logger.info("Extremely small box found in %s:%d: size [%.4f, %.4f]", lbl_path.name, line_no, bw, bh)
+
+            # Check for overlapping bounding boxes (IoU > 0.90) in the same file
+            for i in range(len(valid_boxes_in_file)):
+                line_i, cls_i, box_i = valid_boxes_in_file[i]
+                for j in range(i + 1, len(valid_boxes_in_file)):
+                    line_j, cls_j, box_j = valid_boxes_in_file[j]
+                    iou = calculate_yolo_iou(box_i, box_j)
+                    if iou > 0.90:
+                        err = {
+                            "file": lbl_path.name,
+                            "line1": line_i,
+                            "line2": line_j,
+                            "class1": cls_i,
+                            "class2": cls_j,
+                            "iou": iou
+                        }
+                        overlapping.append(err)
+                        logger.warning("Overlapping bounding boxes (IoU=%.4f) in %s between lines %d and %d", iou, lbl_path.name, line_i, line_j)
+
         if invalid_classes:
             report["invalid_class_ids"][split] = invalid_classes
         if out_of_range:
             report["out_of_range_coords"][split] = out_of_range
         if malformed:
             report["malformed_lines"][split] = malformed
+        if overlapping:
+            report["overlapping_boxes"][split] = overlapping
+        if small:
+            report["small_boxes"][split] = small
             
     report["class_distribution"] = class_distribution
     return report
