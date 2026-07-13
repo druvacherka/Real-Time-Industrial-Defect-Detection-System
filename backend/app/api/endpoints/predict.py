@@ -12,6 +12,7 @@ import os
 import uuid
 import time
 import logging
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -71,6 +72,55 @@ def _generate_request_id() -> str:
     return str(uuid.uuid4())[:12]
 
 
+async def _process_image_async(contents: bytes, request_id: str) -> tuple[dict, dict]:
+    """
+    Run CPU-bound image decoding, validation, preprocessing, and inference in a thread pool.
+    """
+    def decode_and_validate():
+        import cv2
+        import numpy as np
+        arr = np.frombuffer(contents, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("OpenCV decoding failed")
+        h, w = img.shape[:2]
+        if h < 32 or w < 32 or h > 8192 or w > 8192:
+            raise ValueError(f"Image dimensions {w}x{h} are out of allowed bounds [32x32 to 8192x8192]")
+        return img
+
+    try:
+        # Offload decode and validation to prevent event loop blocking
+        await asyncio.to_thread(decode_and_validate)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_image",
+                "message": str(exc),
+            }
+        )
+
+    # Offload preprocessing to prevent event loop blocking
+    try:
+        preprocess_result = await asyncio.to_thread(preprocessor.preprocess, contents)
+        processed_image = preprocess_result["image"]
+    except ImageValidationError as exc:
+        raise HTTPException(status_code=400, detail={"error": "validation_failed", "message": str(exc)})
+    except Exception as exc:
+        logger.error(f"[{request_id}] Preprocessing error: {exc}")
+        raise HTTPException(status_code=500, detail="Image preprocessing failed")
+
+    # Offload model inference to prevent event loop blocking
+    try:
+        model_svc = get_model_service()
+        prediction_result = await asyncio.to_thread(model_svc.predict_image, processed_image)
+    except Exception as exc:
+        logger.error(f"[{request_id}] Inference failed: {exc}")
+        raise HTTPException(status_code=500, detail="Model inference failed")
+
+    return preprocess_result, prediction_result
+
+
 @router.post(
     "/image",
     response_model=UploadImageResponse,
@@ -85,6 +135,7 @@ def _generate_request_id() -> str:
     responses={
         400: {"description": "Invalid file format or empty file"},
         413: {"description": "File too large"},
+        504: {"description": "Request timeout"},
         500: {"description": "Internal processing error"},
     },
 )
@@ -97,105 +148,70 @@ async def predict_image(
 ):
     """
     End-to-end image defect prediction workflow.
-
-    Pipeline:
-        1. Generate unique request ID for tracking
-        2. Validate file format and size
-        3. Save file temporarily to disk
-        4. Preprocess image (resize, normalize, BGR→RGB)
-        5. Run YOLO inference via inference_service
-        6. Return structured prediction JSON
     """
     request_id = _generate_request_id()
     start_time = time.time()
 
     logger.info(
-        f"[{request_id}] Prediction request received: "
-        f"filename={file.filename}, content_type={file.content_type}"
+        f"[request_id={request_id}] [action=predict_image] [status=received] "
+        f"filename={file.filename} content_type={file.content_type}"
     )
 
-    # Step 1 — Validate format
+    # Step 1 — Validate extension format
     ext = _validate_image_format(file.filename, file.content_type)
 
-    # Step 2 — Read file contents
+    # Step 2 — Read file contents asynchronously
     try:
         contents = await file.read()
     except Exception as exc:
-        logger.error(f"[{request_id}] Failed to read uploaded file: {exc}")
+        logger.error(f"[request_id={request_id}] [action=predict_image] [status=failed] error=read_failed details={exc}")
         raise HTTPException(status_code=500, detail="Failed to read uploaded file")
 
-    # Step 3 — Validate file size
+    # Step 2.5 — Validate file size and format headers (magic numbers)
     file_size_mb = len(contents) / (1024 * 1024)
     if file_size_mb > MAX_FILE_SIZE_MB:
+        logger.warning(f"[request_id={request_id}] [action=predict_image] [status=rejected] reason=file_too_large size_mb={file_size_mb:.2f}")
         raise HTTPException(
             status_code=413,
             detail=f"File size {file_size_mb:.2f} MB exceeds maximum {MAX_FILE_SIZE_MB} MB",
         )
     if len(contents) == 0:
+        logger.warning(f"[request_id={request_id}] [action=predict_image] [status=rejected] reason=empty_file")
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    # Step 3.5 — Decode image and validate dimensions
-    try:
-        import cv2
-        import numpy as np
-        arr = np.frombuffer(contents, dtype=np.uint8)
-        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError("OpenCV decoding failed")
-        h, w = img.shape[:2]
-        if h < 32 or w < 32 or h > 8192 or w > 8192:
+    # Magic numbers header validation (JPEG starts with \xFF\xD8\xFF, PNG with \x89PNG)
+    if len(contents) >= 4:
+        if contents.startswith(b"\xff\xd8\xff") or contents.startswith(b"\x89PNG\r\n\x1a\n"):
+            pass
+        else:
+            logger.warning(f"[request_id={request_id}] [action=predict_image] [status=rejected] reason=invalid_magic_bytes")
             raise HTTPException(
                 status_code=400,
-                detail={
-                    "error": "invalid_dimensions",
-                    "message": f"Image dimensions {w}x{h} are out of allowed bounds [32x32 to 8192x8192].",
-                }
+                detail="Unsupported image format. File headers do not match a valid JPEG or PNG image.",
             )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.warning(f"[{request_id}] Complete dimension/corruption validation failed: {exc}")
-        raise HTTPException(status_code=400, detail="Corrupted image: decoding failed")
 
-    # Step 4 — Save temporarily
+    # Step 3 — Save temporarily to disk for audit
     save_filename = f"{request_id}_{file.filename}"
     save_path = UPLOAD_DIR / save_filename
     try:
-        with open(save_path, "wb") as f:
-            f.write(contents)
-        logger.info(f"[{request_id}] Saved to {save_path}")
-    except IOError as exc:
-        logger.error(f"[{request_id}] Failed to save file: {exc}")
+        # Offload file writing to a background thread to keep event loop free
+        await asyncio.to_thread(save_path.write_bytes, contents)
+        logger.info(f"[request_id={request_id}] [action=save_temp_file] [status=success] path={save_path}")
+    except Exception as exc:
+        logger.error(f"[request_id={request_id}] [action=save_temp_file] [status=failed] error={exc}")
         raise HTTPException(status_code=500, detail="Failed to save uploaded file")
 
-    # Step 5 — Preprocess image
+    # Step 4 — Run preprocessing and inference concurrently with a 15-second timeout
     try:
-        preprocess_result = preprocessor.preprocess(contents)
-        processed_image = preprocess_result["image"]
-        logger.info(
-            f"[{request_id}] Preprocessed: "
-            f"{preprocess_result['original_size']} → {preprocess_result['target_size']}"
+        preprocess_result, prediction_result = await asyncio.wait_for(
+            _process_image_async(contents, request_id),
+            timeout=15.0
         )
-    except ImageValidationError as exc:
-        logger.warning(f"[{request_id}] Image validation failed: {exc}")
-        raise HTTPException(status_code=400, detail=f"Image validation failed: {exc}")
-    except Exception as exc:
-        logger.error(f"[{request_id}] Preprocessing error: {exc}")
-        raise HTTPException(status_code=500, detail="Image preprocessing failed")
+    except asyncio.TimeoutError:
+        logger.error(f"[request_id={request_id}] [action=predict_image] [status=timeout] timeout_limit=15.0s")
+        raise HTTPException(status_code=504, detail="Prediction request timed out")
 
-    # Step 6 — Run inference
-    try:
-        model_svc = get_model_service()
-        prediction_result = model_svc.predict_image(processed_image)
-        logger.info(
-            f"[{request_id}] Inference complete: "
-            f"{prediction_result.get('detection_count', 0)} detections"
-        )
-    except Exception as exc:
-        logger.error(f"[{request_id}] Inference failed: {exc}")
-        raise HTTPException(status_code=500, detail="Model inference failed")
-
-    # Step 7 — Build response
+    # Step 5 — Build structured response
     processing_time = time.time() - start_time
 
     # Convert raw detections to Pydantic DetectionItem list
@@ -217,7 +233,8 @@ async def predict_image(
     )
 
     logger.info(
-        f"[{request_id}] Request completed in {processing_time * 1000:.1f} ms"
+        f"[request_id={request_id}] [action=predict_image] [status=completed] "
+        f"detections={len(detection_items)} duration_ms={processing_time * 1000:.1f}"
     )
 
     return UploadImageResponse(
