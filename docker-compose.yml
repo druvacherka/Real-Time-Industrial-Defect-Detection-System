@@ -35,6 +35,9 @@ services:
     ports:
       - "9090:9090"
     restart: always
+    depends_on:
+      api:
+        condition: service_healthy
 
   # ── Grafana Dashboard ──
   grafana:
@@ -46,7 +49,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     restart: always
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
 
 volumes:
   api-logs:
