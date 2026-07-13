@@ -111,18 +111,35 @@ def main():
                 },
                 "classes": {}
             }
+            
+            logger.info("--- Class-wise Defect Detection Performance ---")
+            
             # Extract class-wise metrics
             for i in range(len(metrics.box.all_ap)):
                 class_name = names.get(i, f"class_{i}")
                 # class_result returns (precision, recall, map50, map95)
                 res = metrics.box.class_result(i)
+                precision_val = float(res[0])
+                recall_val = float(res[1])
+                map50_val = float(res[2])
+                map95_val = float(res[3])
+                
                 metrics_dict["classes"][i] = {
                     "name": class_name,
-                    "precision": float(res[0]),
-                    "recall": float(res[1]),
-                    "map50": float(res[2]),
-                    "map95": float(res[3])
+                    "precision": precision_val,
+                    "recall": recall_val,
+                    "map50": map50_val,
+                    "map95": map95_val
                 }
+                
+                logger.info(
+                    f"Class {i} ({class_name}): "
+                    f"Precision={precision_val:.4f}, "
+                    f"Recall={recall_val:.4f}, "
+                    f"mAP50={map50_val:.4f}, "
+                    f"mAP50-95={map95_val:.4f}"
+                )
+            logger.info("------------------------------------------------")
             
             report_path = ProjectConfig.ROOT_DIR / "results" / f"evaluation_report_{args.split}.md"
             generate_markdown_report(metrics_dict, report_path)
