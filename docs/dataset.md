@@ -67,28 +67,38 @@ All values are normalized to `[0.0, 1.0]` relative to image dimensions.
 - **10 %** → `test/`  (180 images)
 - Split uses `random.seed(42)` for full reproducibility.
 
-### 3. Automated Dataset Health Monitoring (`scripts/monitor_dataset_health.py`)
-Runs comprehensive validation on the dataset to detect:
-- Corrupted or unreadable images.
-- Duplicate images based on MD5 checksums.
-- Missing labels or missing images.
-- Annotation consistency including class ID bounds and coordinate validation.
-- Cross-split stem duplicates (data leakage).
-Outputs a health monitoring report to `reports/dataset_health/dataset_health_report.md`.
+### 3. Advanced Dataset Validation & Integrity Checks (`scripts/verify_dataset.py`)
+Runs comprehensive validation on the dataset to verify structure, image-label mapping, and annotation integrity:
+- Checks folder existence for images/labels split directories.
+- Identifies missing labels (images without labels) and missing images (labels without images).
+- Scans for corrupted/unreadable image files.
+- Computes MD5 checksums to detect duplicate images.
+- Checks for duplicate stems across splits to detect data leakage.
+- Validates annotation consistency: checks number of tokens (exactly 5), numeric parse correctness, coordinate values (between 0.0 and 1.0).
+- **Advanced box checks**: detects overlapping bounding boxes (IoU > 0.90) in the same image, and flags extremely small boxes (relative width/height < 0.005).
+- Outputs a validation report to `reports/dataset_validation_report.md` and a comprehensive data integrity report to `reports/dataset_integrity_report.md`.
 
 ### 4. Class Balancing via Albumentations (`scripts/augment_dataset.py`)
-Minority classes in the training split are augmented until every class reaches the majority count.
+Minority classes in the training split are augmented until every class reaches the majority class count (or a specified target count). 
+- The augmentation pipeline is optimized to use 9 distinct Albumentations transforms: HorizontalFlip, VerticalFlip, Rotate, ShiftScaleRotate, RandomBrightnessContrast, GaussianBlur, MotionBlur, CLAHE, and HueSaturationValue.
+- Ensures bounding boxes are safe post-augmentation (drops boxes falling below 30% visibility).
+- Generates a balancing report in `reports/dataset_balancing_report.md` and charts in `reports/graphs/`.
 
 ### 5. Parallel Preprocessing (`scripts/preprocess_pipeline.py`)
-- High-speed resizing to **640 × 640** utilizing Python's `ProcessPoolExecutor`.
+- High-speed resizing to **640 × 640** utilizing Python's `ProcessPoolExecutor` for concurrency.
 - Supports configurable image normalization including `min_max`, `imagenet`, and Z-score standardization.
-- Saves stats to `reports/preprocessing_statistics.json` and a markdown summary to `reports/preprocessing_validation_summary.md`.
+- **Detailed Preprocessing Metrics**: collects timing breakdown across four stages:
+  1. *Read & Validate*
+  2. *Resize*
+  3. *Normalization*
+  4. *Save & Format*
+- Saves metrics breakdown to `reports/preprocessing_statistics.json` and a markdown summary to `reports/preprocessing_validation_summary.md`.
 
 ### 6. Analytics Dashboard (`scripts/generate_dataset_dashboard.py`)
 - Computes overall dataset statistics.
 - Computes bounding box dimensions, aspect ratio statistics, and box densities.
-- Generates side-by-side distribution charts and split pie charts.
-- Overlays ground-truth annotations on random samples from each split.
+- Generates representation charts and split pie charts.
+- Overlays ground-truth annotations on random samples from each split using premium alpha transparency blending (fill factor 25%).
 - Outputs files to `reports/analytics/`.
 
 ---
@@ -109,7 +119,8 @@ Minority classes in the training split are augmented until every class reaches t
 
 | Report | Location |
 |--------|----------|
-| Dataset Health Report | `reports/dataset_health/dataset_health_report.md` |
+| Dataset Validation Report | `reports/dataset_validation_report.md` |
+| Dataset Integrity Report | `reports/dataset_integrity_report.md` |
 | Dataset Quality Inspection | `reports/quality/dataset_quality_report.md` |
 | Dataset Balancing | `reports/dataset_balancing_report.md` |
 | Preprocessing statistics | `reports/preprocessing_statistics.json` |

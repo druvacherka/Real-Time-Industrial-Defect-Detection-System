@@ -143,7 +143,7 @@ python scripts/monitor_dataset_health.py
 # Step 4: Run automated dataset quality inspection (generates reports/quality/dataset_quality_report.md)
 python scripts/inspect_dataset_quality.py
  
-# Step 5: Run comprehensive pair and annotation validation (generates reports/dataset_validation_report.md)
+# Step 5: Run comprehensive pair, annotation, and advanced box/overlap validation (generates reports/dataset_validation_report.md and reports/dataset_integrity_report.md)
 python scripts/verify_dataset.py
   
 # Step 6: Balance class distribution using Albumentations offline augmentation (generates reports/dataset_balancing_report.md)
