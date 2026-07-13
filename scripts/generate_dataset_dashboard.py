@@ -39,6 +39,7 @@ from scripts.config import (
     ensure_dirs,
 )
 from utils.dataset_statistics import calculate_stats, load_yolo_labels
+from utils.visualization import draw_yolo_annotations
 
 try:
     import matplotlib
@@ -182,47 +183,28 @@ def draw_annotated_samples(
             continue
             
         samples = random.sample(img_files, min(num_samples_per_split, len(img_files)))
-        for idx, img_path in enumerate(samples):
+        for img_path in samples:
             img = cv2.imread(str(img_path))
             if img is None:
                 continue
                 
-            h, w, _ = img.shape
             lbl_path = lbl_split_dir / f"{img_path.stem}.txt"
             boxes = load_yolo_labels(lbl_path)
             
-            for box in boxes:
-                cls_id = int(box[0])
-                cx, cy, bw, bh = box[1:]
-                
-                # Convert normalized YOLO coordinates to pixel positions
-                x1 = int((cx - bw / 2) * w)
-                y1 = int((cy - bh / 2) * h)
-                x2 = int((cx + bw / 2) * w)
-                y2 = int((cy + bh / 2) * h)
-                
-                # Boundary clamping
-                x1 = max(0, min(w - 1, x1))
-                y1 = max(0, min(h - 1, y1))
-                x2 = max(0, min(w - 1, x2))
-                y2 = max(0, min(h - 1, y2))
-                
-                color = colors[cls_id % len(colors)]
-                
-                # Draw box
-                cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-                
-                # Label overlay background
-                label_text = class_names[cls_id]
-                (text_w, text_h), baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
-                cv2.rectangle(img, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), color, -1)
-                
-                # Label text
-                cv2.putText(img, label_text, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1, cv2.LINE_AA)
+            # Use premium alpha-blended drawing
+            annotated_img = draw_yolo_annotations(
+                image=img,
+                boxes=boxes,
+                class_names=class_names,
+                colors=colors,
+                line_thickness=2,
+                font_scale=0.45,
+                fill_alpha=0.25
+            )
                 
             out_filename = f"sample_{split}_{img_path.stem}.jpg"
             out_path = output_dir / out_filename
-            cv2.imwrite(str(out_path), img)
+            cv2.imwrite(str(out_path), annotated_img)
             saved_samples.append(f"reports/analytics/{out_filename}")
             
     return saved_samples

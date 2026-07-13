@@ -78,21 +78,24 @@ def draw_annotations(
     image: np.ndarray,
     objects: List[Dict[str, Union[str, Tuple[int, int, int, int]]]],
     line_thickness: int = 2,
-    font_scale: float = 0.5
+    font_scale: float = 0.5,
+    fill_alpha: float = 0.20
 ) -> np.ndarray:
     """
-    Draws bounding boxes and labels on the image.
+    Draws bounding boxes and labels on the image with premium alpha blending fill.
     
     Args:
         image: Source image in BGR format.
         objects: List of dictionaries containing "class" and "bbox".
         line_thickness: Box line thickness.
         font_scale: Font scale for label text.
+        fill_alpha: Transparency factor for bbox interior fill.
         
     Returns:
         The annotated image copy.
     """
     annotated_img = image.copy()
+    overlay = image.copy()
     
     for obj in objects:
         class_name = obj["class"]
@@ -100,7 +103,9 @@ def draw_annotations(
         
         color = get_class_color(class_name)
         
-        # Draw box
+        # Draw filled box on overlay
+        cv2.rectangle(overlay, (xmin, ymin), (xmax, ymax), color, -1)
+        # Draw border on annotated_img
         cv2.rectangle(annotated_img, (xmin, ymin), (xmax, ymax), color, line_thickness)
         
         # Prepare text label
@@ -113,7 +118,7 @@ def draw_annotations(
         cv2.rectangle(
             annotated_img,
             (xmin, ymin - text_height - 4),
-            (xmin + text_width, ymin),
+            (xmin + text_width + 4, ymin),
             color,
             -1
         )
@@ -122,12 +127,66 @@ def draw_annotations(
         cv2.putText(
             annotated_img,
             label,
-            (xmin, ymin - 4),
+            (xmin + 2, ymin - 3),
             cv2.FONT_HERSHEY_SIMPLEX,
             font_scale,
             (255, 255, 255),
             1,
             lineType=cv2.LINE_AA
         )
+        
+    if fill_alpha > 0:
+        cv2.addWeighted(overlay, fill_alpha, annotated_img, 1.0 - fill_alpha, 0, annotated_img)
+        
+    return annotated_img
+
+
+def draw_yolo_annotations(
+    image: np.ndarray,
+    boxes: List[List[float]],
+    class_names: List[str],
+    colors: List[Tuple[int, int, int]] = None,
+    line_thickness: int = 2,
+    font_scale: float = 0.4,
+    fill_alpha: float = 0.20
+) -> np.ndarray:
+    """
+    Draws YOLO format bounding boxes (class, cx, cy, bw, bh) with alpha-blended fills.
+    """
+    annotated_img = image.copy()
+    overlay = image.copy()
+    h, w, _ = image.shape
+    
+    for box in boxes:
+        cls_id = int(box[0])
+        cx, cy, bw, bh = box[1:]
+        
+        x1 = int((cx - bw / 2) * w)
+        y1 = int((cy - bh / 2) * h)
+        x2 = int((cx + bw / 2) * w)
+        y2 = int((cy + bh / 2) * h)
+        
+        x1 = max(0, min(w - 1, x1))
+        y1 = max(0, min(h - 1, y1))
+        x2 = max(0, min(w - 1, x2))
+        y2 = max(0, min(h - 1, y2))
+        
+        if colors:
+            color = colors[cls_id % len(colors)]
+        else:
+            class_name = class_names[cls_id] if cls_id < len(class_names) else "unknown"
+            color = get_class_color(class_name)
+            
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
+        cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color, line_thickness)
+        
+        label_text = class_names[cls_id] if cls_id < len(class_names) else f"cls_{cls_id}"
+        (text_w, text_h), baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
+        
+        cv2.rectangle(annotated_img, (x1, y1 - text_h - 4), (x1 + text_w + 4, y1), color, -1)
+        cv2.putText(annotated_img, label_text, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 1, cv2.LINE_AA)
+        
+    if fill_alpha > 0:
+        cv2.addWeighted(overlay, fill_alpha, annotated_img, 1.0 - fill_alpha, 0, annotated_img)
         
     return annotated_img
