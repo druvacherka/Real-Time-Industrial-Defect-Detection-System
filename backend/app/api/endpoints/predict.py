@@ -32,6 +32,7 @@ from app.schemas.responses import (
 from app.schemas.requests import LiveStreamRequest
 from app.services.image_service import ImagePreprocessingService, ImageValidationError
 from app.services.model_service import get_model_service
+from app.core.metrics import PREPROCESSING_TIME, INFERENCE_TIME, TOTAL_LATENCY, REQUEST_COUNTER
 
 logger = logging.getLogger("defect_detection.predict")
 
@@ -102,20 +103,27 @@ async def _process_image_async(contents: bytes, request_id: str, conf_threshold:
 
     # Offload preprocessing to prevent event loop blocking
     try:
+        start_prep = time.time()
         preprocess_result = await asyncio.to_thread(preprocessor.preprocess, contents)
         processed_image = preprocess_result["image"]
+        PREPROCESSING_TIME.observe(time.time() - start_prep)
     except ImageValidationError as exc:
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="validation_failed").inc()
         raise HTTPException(status_code=400, detail={"error": "validation_failed", "message": str(exc)})
     except Exception as exc:
         logger.error(f"[{request_id}] Preprocessing error: {exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="preprocessing_failed").inc()
         raise HTTPException(status_code=500, detail="Image preprocessing failed")
 
     # Offload model inference to prevent event loop blocking
     try:
         model_svc = get_model_service()
+        start_inf = time.time()
         prediction_result = await asyncio.to_thread(model_svc.predict_image, processed_image, conf_threshold)
+        INFERENCE_TIME.observe(time.time() - start_inf)
     except Exception as exc:
         logger.error(f"[{request_id}] Inference failed: {exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="inference_failed").inc()
         raise HTTPException(status_code=500, detail="Model inference failed")
 
     return preprocess_result, prediction_result
@@ -172,18 +180,21 @@ async def predict_image(
         contents = await file.read()
     except Exception as exc:
         logger.error(f"[request_id={request_id}] [action=predict_image] [status=failed] error=read_failed details={exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="read_failed").inc()
         raise HTTPException(status_code=500, detail="Failed to read uploaded file")
 
     # Step 2.5 — Validate file size and format headers (magic numbers)
     file_size_mb = len(contents) / (1024 * 1024)
     if file_size_mb > MAX_FILE_SIZE_MB:
         logger.warning(f"[request_id={request_id}] [action=predict_image] [status=rejected] reason=file_too_large size_mb={file_size_mb:.2f}")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="rejected_size").inc()
         raise HTTPException(
             status_code=413,
             detail=f"File size {file_size_mb:.2f} MB exceeds maximum {MAX_FILE_SIZE_MB} MB",
         )
     if len(contents) == 0:
         logger.warning(f"[request_id={request_id}] [action=predict_image] [status=rejected] reason=empty_file")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="rejected_empty").inc()
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
     # Magic numbers header validation (JPEG starts with \xFF\xD8\xFF, PNG with \x89PNG)
@@ -192,6 +203,7 @@ async def predict_image(
             pass
         else:
             logger.warning(f"[request_id={request_id}] [action=predict_image] [status=rejected] reason=invalid_magic_bytes")
+            REQUEST_COUNTER.labels(endpoint="/predict/image", status="rejected_magic_bytes").inc()
             raise HTTPException(
                 status_code=400,
                 detail="Unsupported image format. File headers do not match a valid JPEG or PNG image.",
@@ -206,6 +218,7 @@ async def predict_image(
         logger.info(f"[request_id={request_id}] [action=save_temp_file] [status=success] path={save_path}")
     except Exception as exc:
         logger.error(f"[request_id={request_id}] [action=save_temp_file] [status=failed] error={exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="temp_save_failed").inc()
         raise HTTPException(status_code=500, detail="Failed to save uploaded file")
 
     # Step 4 — Run preprocessing and inference concurrently with a 15-second timeout
@@ -216,10 +229,13 @@ async def predict_image(
         )
     except asyncio.TimeoutError:
         logger.error(f"[request_id={request_id}] [action=predict_image] [status=timeout] timeout_limit=15.0s")
+        REQUEST_COUNTER.labels(endpoint="/predict/image", status="timeout").inc()
         raise HTTPException(status_code=504, detail="Prediction request timed out")
 
     # Step 5 — Build structured response
     processing_time = time.time() - start_time
+    TOTAL_LATENCY.observe(processing_time)
+    REQUEST_COUNTER.labels(endpoint="/predict/image", status="success").inc()
 
     # Convert raw detections to Pydantic DetectionItem list
     detection_items = []
@@ -320,18 +336,21 @@ async def predict_video(
         contents = await file.read()
     except Exception as exc:
         logger.error(f"[request_id={request_id}] [action=predict_video] [status=failed] error=read_failed details={exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/video", status="read_failed").inc()
         raise HTTPException(status_code=500, detail="Failed to read uploaded file")
 
     # Step 3 — Validate file size
     file_size_mb = len(contents) / (1024 * 1024)
     if file_size_mb > MAX_VIDEO_SIZE_MB:
         logger.warning(f"[request_id={request_id}] [action=predict_video] [status=rejected] reason=file_too_large size_mb={file_size_mb:.2f}")
+        REQUEST_COUNTER.labels(endpoint="/predict/video", status="rejected_size").inc()
         raise HTTPException(
             status_code=413,
             detail=f"File size {file_size_mb:.2f} MB exceeds maximum {MAX_VIDEO_SIZE_MB} MB",
         )
     if len(contents) == 0:
         logger.warning(f"[request_id={request_id}] [action=predict_video] [status=rejected] reason=empty_file")
+        REQUEST_COUNTER.labels(endpoint="/predict/video", status="rejected_empty").inc()
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
     # Step 4 — Save temporarily to disk asynchronously
@@ -342,24 +361,29 @@ async def predict_video(
         logger.info(f"[request_id={request_id}] [action=save_temp_video] [status=success] path={save_path}")
     except Exception as exc:
         logger.error(f"[request_id={request_id}] [action=save_temp_video] [status=failed] error={exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/video", status="temp_save_failed").inc()
         raise HTTPException(status_code=500, detail="Failed to save uploaded file")
 
     # Step 5 — Run inference with 45-second timeout
     try:
         model_svc = get_model_service()
         # Offload CPU-bound frame-by-frame video decoding and inference to thread pool
+        start_inf = time.time()
         prediction_result = await asyncio.wait_for(
             asyncio.to_thread(model_svc.predict_video, save_path, conf_threshold),
             timeout=45.0
         )
+        INFERENCE_TIME.observe(time.time() - start_inf)
         if prediction_result.get("status") == "error":
             raise ValueError(prediction_result.get("error_message", "Unknown error"))
         logger.info(f"[request_id={request_id}] [action=predict_video] [status=completed_inference]")
     except asyncio.TimeoutError:
         logger.error(f"[request_id={request_id}] [action=predict_video] [status=timeout] timeout_limit=45.0s")
+        REQUEST_COUNTER.labels(endpoint="/predict/video", status="timeout").inc()
         raise HTTPException(status_code=504, detail="Video processing request timed out")
     except Exception as exc:
         logger.error(f"[request_id={request_id}] [action=predict_video] [status=failed] error={exc}")
+        REQUEST_COUNTER.labels(endpoint="/predict/video", status="inference_failed").inc()
         raise HTTPException(status_code=500, detail=f"Video processing failed: {str(exc)}")
     finally:
         # Clean up video file after processing to save disk space
@@ -372,6 +396,8 @@ async def predict_video(
 
     # Step 6 — Build response
     processing_time = time.time() - start_time
+    TOTAL_LATENCY.observe(processing_time)
+    REQUEST_COUNTER.labels(endpoint="/predict/video", status="success").inc()
 
     summary_items = []
     for item in prediction_result.get("detection_summary", []):
