@@ -235,6 +235,9 @@ docker-compose down -v
 2. Add **Prometheus** as a data source with the URL `http://prometheus:9090`.
 3. Create charts using metrics exported by the backend, such as `http_requests_total` and API request latency histograms.
 
+### Production Security & Deployment Details
+For detailed step-by-step instructions on securing the API endpoints using **API Key Authentication**, verifying configurations, and deploying to production, refer to the [Production Deployment & Configuration Guide](docs/deployment.md).
+
 ---
 
 ## 📋 Phase Tracker

@@ -72,3 +72,43 @@ def configure_logging():
         f"Logging configured: level={settings.LOG_LEVEL}, dir={LOG_DIR}"
     )
     return logger
+
+
+def validate_production_config(logger=None):
+    """
+    Validate environment variables and folder setups for production.
+    Raises warnings or errors for unsafe configurations.
+    """
+    if logger is None:
+        logger = logging.getLogger("defect_detection.config_validation")
+        
+    logger.info("Starting production configuration validation...")
+
+    # 1. API Key Security Check
+    if settings.API_KEY == "industrial-defect-secret-key":
+        logger.warning(
+            "SECURITY WARNING: The API_KEY is set to the default fallback value. "
+            "Please configure a strong custom API_KEY in production environment settings."
+        )
+    else:
+        logger.info("API Key validation: Custom API key is set.")
+
+    # 2. Check directory permissions
+    for directory, name in [(LOG_DIR, "Log"), (UPLOAD_DIR, "Upload")]:
+        if directory.exists():
+            if not os.access(directory, os.W_OK):
+                logger.error(f"CRITICAL: {name} directory '{directory}' is not writable!")
+            else:
+                logger.info(f"{name} directory '{directory}' is verified writable.")
+        else:
+            logger.warning(f"{name} directory '{directory}' does not exist yet.")
+
+    # 3. Model Weights Check
+    weights = Path(MODEL_WEIGHTS_PATH)
+    if not weights.exists():
+        logger.warning(
+            f"MODEL PATH WARNING: Bounding box model weights not found at '{MODEL_WEIGHTS_PATH}'. "
+            "System will fallback to running in mock/placeholder prediction mode."
+        )
+    else:
+        logger.info(f"Model weights verified at '{MODEL_WEIGHTS_PATH}'. Size: {weights.stat().st_size / (1024*1024):.2f} MB")

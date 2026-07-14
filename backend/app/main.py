@@ -20,6 +20,7 @@ from app.core.config import (
     APP_VERSION,
     APP_DESCRIPTION,
     ALLOWED_ORIGINS,
+    validate_production_config,
 )
 from app.core.logger import setup_logging, get_logger
 from app.api.routes.router import api_router
@@ -44,6 +45,10 @@ async def lifespan(application: FastAPI):
     # ── Startup ─────────────────────────────────────────────────────────
     setup_logging()
     logger = get_logger("main")
+    
+    # Run production configuration safety validations
+    validate_production_config(logger)
+    
     logger.info(
         "Starting %s v%s — server is ready to accept requests",
         APP_NAME,
