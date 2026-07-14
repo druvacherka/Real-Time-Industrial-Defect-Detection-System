@@ -110,7 +110,8 @@ def generate_markdown_report(metrics_dict: dict, output_path: Path):
     
     overall = metrics_dict.get("overall", {})
     for k, v in overall.items():
-        lines.append(f"| {k.upper()} | {v:.4f} |")
+        val = float(v) if (v is not None and not isinstance(v, str)) else 0.0
+        lines.append(f"| {k.upper()} | {val:.4f} |")
         
     lines.extend([
         "",
@@ -122,10 +123,20 @@ def generate_markdown_report(metrics_dict: dict, output_path: Path):
     
     classes = metrics_dict.get("classes", {})
     for class_id, data in sorted(classes.items(), key=lambda x: x[0]):
+        precision_val = data.get('precision', 0.0)
+        recall_val = data.get('recall', 0.0)
+        map50_val = data.get('map50', 0.0)
+        map95_val = data.get('map95', 0.0)
+        
+        precision_val = float(precision_val) if (precision_val is not None and not isinstance(precision_val, str)) else 0.0
+        recall_val = float(recall_val) if (recall_val is not None and not isinstance(recall_val, str)) else 0.0
+        map50_val = float(map50_val) if (map50_val is not None and not isinstance(map50_val, str)) else 0.0
+        map95_val = float(map95_val) if (map95_val is not None and not isinstance(map95_val, str)) else 0.0
+        
         lines.append(
             f"| {class_id} | {data.get('name', 'N/A')} | "
-            f"{data.get('precision', 0.0):.4f} | {data.get('recall', 0.0):.4f} | "
-            f"{data.get('map50', 0.0):.4f} | {data.get('map95', 0.0):.4f} |"
+            f"{precision_val:.4f} | {recall_val:.4f} | "
+            f"{map50_val:.4f} | {map95_val:.4f} |"
         )
         
     lines.extend([
@@ -161,6 +172,8 @@ def generate_splits_comparison_report(val_metrics: dict, test_metrics: dict, out
     for metric_name in ["precision", "recall", "map50", "map95"]:
         val_val = val_overall.get(metric_name, 0.0)
         test_val = test_overall.get(metric_name, 0.0)
+        val_val = float(val_val) if (val_val is not None and not isinstance(val_val, str)) else 0.0
+        test_val = float(test_val) if (test_val is not None and not isinstance(test_val, str)) else 0.0
         delta = test_val - val_val
         lines.append(f"| {metric_name.upper()} | {val_val:.4f} | {test_val:.4f} | {delta:+.4f} |")
         
@@ -181,10 +194,14 @@ def generate_splits_comparison_report(val_metrics: dict, test_metrics: dict, out
         
         val_map50 = val_data.get("map50", 0.0)
         test_map50 = test_data.get("map50", 0.0)
+        val_map50 = float(val_map50) if (val_map50 is not None and not isinstance(val_map50, str)) else 0.0
+        test_map50 = float(test_map50) if (test_map50 is not None and not isinstance(test_map50, str)) else 0.0
         delta_map50 = test_map50 - val_map50
         
         val_map95 = val_data.get("map95", 0.0)
         test_map95 = test_data.get("map95", 0.0)
+        val_map95 = float(val_map95) if (val_map95 is not None and not isinstance(val_map95, str)) else 0.0
+        test_map95 = float(test_map95) if (test_map95 is not None and not isinstance(test_map95, str)) else 0.0
         delta_map95 = test_map95 - val_map95
         
         lines.append(

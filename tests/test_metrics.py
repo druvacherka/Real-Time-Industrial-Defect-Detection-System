@@ -17,6 +17,7 @@ from utils.metrics import (
     parse_training_results,
     plot_learning_curves,
     generate_markdown_report,
+    generate_splits_comparison_report,
 )
 
 
@@ -115,6 +116,36 @@ class TestMetrics(unittest.TestCase):
         self.assertIn("0.8000", content)
         self.assertIn("0.8200", content)
         self.assertIn("+0.0200", content)
+    def test_report_generation_handles_zero_detections_and_nones(self):
+        """Should safely handle None/empty metrics representing zero detections without crashing."""
+        empty_metrics = {
+            "overall": {
+                "precision": None,
+                "recall": None,
+                "map50": None,
+                "map95": None
+            },
+            "classes": {
+                0: {"name": "crazing", "precision": None, "recall": None, "map50": None, "map95": None}
+            }
+        }
+        
+        report_path = self.temp_dir / "empty_report.md"
+        generate_markdown_report(empty_metrics, report_path)
+        self.assertTrue(report_path.exists())
+        content = report_path.read_text(encoding="utf-8")
+        self.assertIn("0.0000", content)  # Fallback value verified
+        
+        # Test comparison with empty values
+        val_metrics = {
+            "overall": {"precision": 0.50, "recall": 0.40, "map50": 0.45, "map95": 0.20},
+            "classes": {0: {"name": "crazing", "precision": 0.50, "recall": 0.40, "map50": 0.45, "map95": 0.20}}
+        }
+        comparison_path = self.temp_dir / "empty_comparison.md"
+        generate_splits_comparison_report(val_metrics, empty_metrics, comparison_path)
+        self.assertTrue(comparison_path.exists())
+        comp_content = comparison_path.read_text(encoding="utf-8")
+        self.assertIn("-0.5000", comp_content)
 
 
 if __name__ == "__main__":
