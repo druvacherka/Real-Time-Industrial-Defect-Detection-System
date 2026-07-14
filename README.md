@@ -154,6 +154,9 @@ python scripts/preprocess_pipeline.py
 
 # Step 8: Generate dataset analytics dashboard and visualizations (generates reports/analytics/dataset_analytics_report.md)
 python scripts/generate_dataset_dashboard.py
+
+# Step 9: Track dataset versions and generate metadata database (generates dataset/metadata.json)
+python scripts/manage_metadata.py
 ```
 
 ### 3. Model Training & Evaluation

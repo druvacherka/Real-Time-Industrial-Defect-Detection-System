@@ -101,6 +101,11 @@ Minority classes in the training split are augmented until every class reaches t
 - Overlays ground-truth annotations on random samples from each split using premium alpha transparency blending (fill factor 25%).
 - Outputs files to `reports/analytics/`.
 
+### 7. Dataset Versioning and Metadata Management (`utils/metadata_manager.py` / `scripts/manage_metadata.py`)
+- Automatic management and tracking of semantic dataset version numbers (e.g. `v1.0.0`, `v1.0.1`, etc.).
+- Compiles metadata metrics (total image counts, bounding boxes per split, total file size, and class distributions).
+- Saves metadata database files directly as JSON to `dataset/metadata.json` for integration support.
+
 ---
 
 ## Configuration Files
@@ -126,6 +131,7 @@ Minority classes in the training split are augmented until every class reaches t
 | Preprocessing statistics | `reports/preprocessing_statistics.json` |
 | Preprocessing validation | `reports/preprocessing_validation_summary.md` |
 | Dataset Analytics Dashboard | `reports/analytics/dataset_analytics_report.md` |
+| Dataset Metadata Database | `dataset/metadata.json` |
 | Class distribution chart | `reports/analytics/class_distribution_dashboard.png` |
 | Dataset split chart | `reports/analytics/dataset_split_dashboard.png` |
 | Image sample visualizations | `reports/analytics/sample_*.jpg` |
