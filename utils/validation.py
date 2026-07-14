@@ -320,15 +320,21 @@ def validate_annotation_consistency(
                     class_distribution[cls_id] = class_distribution.get(cls_id, 0) + 1
                     
                 # Validate Box Coordinates
+                import math
                 coord_errors = []
-                if not (0.0 <= cx <= 1.0):
-                    coord_errors.append(f"cx={cx:.4f} out of [0,1]")
-                if not (0.0 <= cy <= 1.0):
-                    coord_errors.append(f"cy={cy:.4f} out of [0,1]")
-                if not (0.0 < bw <= 1.0):
-                    coord_errors.append(f"bw={bw:.4f} not in (0,1]")
-                if not (0.0 < bh <= 1.0):
-                    coord_errors.append(f"bh={bh:.4f} not in (0,1]")
+                
+                # Check for NaN or Inf values
+                if any(math.isnan(v) or math.isinf(v) for v in (cx, cy, bw, bh)):
+                    coord_errors.append("contains NaN or Inf")
+                else:
+                    if not (0.0 <= cx <= 1.0):
+                        coord_errors.append(f"cx={cx:.4f} out of [0,1]")
+                    if not (0.0 <= cy <= 1.0):
+                        coord_errors.append(f"cy={cy:.4f} out of [0,1]")
+                    if bw <= 0.0 or bw > 1.0:
+                        coord_errors.append(f"bw={bw:.4f} not in (0,1]")
+                    if bh <= 0.0 or bh > 1.0:
+                        coord_errors.append(f"bh={bh:.4f} not in (0,1]")
                     
                 if coord_errors:
                     err = {
@@ -339,7 +345,7 @@ def validate_annotation_consistency(
                     }
                     out_of_range.append(err)
                     report["total_errors"] += 1
-                    logger.warning("Out of range box coordinates in %s:%d: %s", lbl_path.name, line_no, ", ".join(coord_errors))
+                    logger.warning("Out of range or invalid box coordinates in %s:%d: %s", lbl_path.name, line_no, ", ".join(coord_errors))
                 else:
                     valid_boxes_in_file.append((line_no, cls_id, [cx, cy, bw, bh]))
 
