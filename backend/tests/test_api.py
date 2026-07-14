@@ -1,10 +1,10 @@
 """
 API Endpoints Unit Tests
 =========================
-Verifies endpoints using FastAPI TestClient.
+Verifies endpoints using FastAPI TestClient and tests API Key authentication middleware.
 
 Author: prajwaledu802-coder
-Date: 2026-07-07
+Date: 2026-07-14
 """
 
 import pytest
@@ -13,12 +13,13 @@ import cv2
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.core.config import settings
 
 client = TestClient(app)
 
 
 def test_health_endpoint():
-    """Verify GET /health endpoint returns successfully."""
+    """Verify GET /health endpoint returns successfully without auth."""
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
@@ -27,16 +28,15 @@ def test_health_endpoint():
 
 
 def test_root_endpoint():
-    """Verify GET / endpoint returns successfully."""
+    """Verify GET / endpoint returns successfully without auth."""
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
     assert "project" in data
 
 
-def test_predict_image_endpoint():
-    """Verify POST /predict/image endpoint returns successfully with sample image input."""
-    # Create dummy black image
+def test_predict_image_unauthorized():
+    """Verify prediction endpoints return 401 when X-API-Key is missing."""
     img = np.zeros((100, 100, 3), dtype=np.uint8)
     _, img_encoded = cv2.imencode(".png", img)
     img_bytes = img_encoded.tobytes()
@@ -44,6 +44,37 @@ def test_predict_image_endpoint():
     response = client.post(
         "/predict/image",
         files={"file": ("test.png", img_bytes, "image/png")}
+    )
+    assert response.status_code == 401
+    assert response.json()["error"] == "unauthorized"
+
+
+def test_predict_image_forbidden():
+    """Verify prediction endpoints return 403 when X-API-Key is incorrect."""
+    img = np.zeros((100, 100, 3), dtype=np.uint8)
+    _, img_encoded = cv2.imencode(".png", img)
+    img_bytes = img_encoded.tobytes()
+
+    response = client.post(
+        "/predict/image",
+        files={"file": ("test.png", img_bytes, "image/png")},
+        headers={"X-API-Key": "wrong-key"}
+    )
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+
+
+def test_predict_image_endpoint():
+    """Verify POST /predict/image endpoint returns successfully with correct API Key."""
+    # Create dummy black image
+    img = np.zeros((100, 100, 3), dtype=np.uint8)
+    _, img_encoded = cv2.imencode(".png", img)
+    img_bytes = img_encoded.tobytes()
+
+    response = client.post(
+        "/predict/image",
+        files={"file": ("test.png", img_bytes, "image/png")},
+        headers={"X-API-Key": settings.API_KEY}
     )
     assert response.status_code == 200
     data = response.json()
@@ -53,10 +84,11 @@ def test_predict_image_endpoint():
 
 
 def test_predict_video_validation():
-    """Verify video input validation restricts unsupported formats."""
+    """Verify video input validation restricts unsupported formats (with auth)."""
     response = client.post(
         "/predict/video",
-        files={"file": ("test.gif", b"dummy bytes", "image/gif")}
+        files={"file": ("test.gif", b"dummy bytes", "image/gif")},
+        headers={"X-API-Key": settings.API_KEY}
     )
     assert response.status_code == 400
     data = response.json()
@@ -64,10 +96,11 @@ def test_predict_video_validation():
 
 
 def test_predict_live_validation():
-    """Verify live endpoint connection failure handling with invalid stream URL."""
+    """Verify live endpoint connection failure handling with invalid stream URL (with auth)."""
     response = client.post(
         "/predict/live",
-        json={"source": "invalid_source_url", "conf_threshold": 0.25}
+        json={"source": "invalid_source_url", "conf_threshold": 0.25},
+        headers={"X-API-Key": settings.API_KEY}
     )
     assert response.status_code == 400
     data = response.json()

@@ -16,8 +16,9 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query, Security
 from fastapi.responses import JSONResponse
+from app.core.auth import api_key_header
 
 from app.schemas.responses import (
     UploadImageResponse,
@@ -138,7 +139,7 @@ async def _process_image_async(contents: bytes, request_id: str, conf_threshold:
         "The image is validated, preprocessed through the OpenCV pipeline, "
         "run through the YOLO inference service, and returns structured "
         "detection results including defect class, confidence, bounding box, "
-        "and processing time."
+        "and processing time. Requires 'X-API-Key' header or Bearer Token authentication."
     ),
     responses={
         400: {"description": "Invalid file format or empty file"},
@@ -160,6 +161,7 @@ async def predict_image(
         description="Confidence threshold for detections override",
         example=0.25,
     ),
+    api_key: str = Security(api_key_header),
 ):
     """
     End-to-end image defect prediction workflow.
@@ -295,7 +297,8 @@ def _validate_video_format(filename: str) -> str:
         "Upload a single video file (MP4, AVI, MOV) for defect detection. "
         "The video is validated, saved temporarily to disk, analyzed with OpenCV "
         "to extract metadata (FPS, frame count, resolution), run through the "
-        "YOLO inference service, and returns aggregated defect summary metrics."
+        "YOLO inference service, and returns aggregated defect summary metrics. "
+        "Requires 'X-API-Key' header or Bearer Token authentication."
     ),
     responses={
         400: {"description": "Invalid file format or empty file"},
@@ -316,6 +319,7 @@ async def predict_video(
         description="Confidence threshold for detections override",
         example=0.25,
     ),
+    api_key: str = Security(api_key_header),
 ):
     """
     End-to-end video defect prediction workflow.
@@ -440,7 +444,8 @@ async def predict_video(
     description=(
         "Start a defect detection session on a live RTSP/RTMP stream or webcam. "
         "The stream is validated and initialized using OpenCV VideoCapture with "
-        "automatic error recovery and retry logic."
+        "automatic error recovery and retry logic. "
+        "Requires 'X-API-Key' header or Bearer Token authentication."
     ),
     responses={
         400: {"description": "Invalid stream URL or connection failure"},
@@ -450,6 +455,7 @@ async def predict_video(
 async def predict_live(
     request_data: LiveStreamRequest,
     request: Request,
+    api_key: str = Security(api_key_header),
 ):
     request_id = _generate_request_id()
     logger.info(

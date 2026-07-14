@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     )
     API_HOST: str = Field(default="0.0.0.0", description="Server bind address")
     API_PORT: int = Field(default=8000, description="Server port")
+    API_KEY: str = Field(default="industrial-defect-secret-key", description="API Key for prediction endpoints")
     DEBUG: bool = Field(default=False, description="Enable debug mode")
 
     # ---- Model Configuration ----

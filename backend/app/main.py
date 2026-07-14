@@ -25,6 +25,7 @@ from app.core.logger import setup_logging, get_logger
 from app.api.routes.router import api_router
 from app.services.image_service import ImageValidationError
 from app.schemas.responses import ErrorResponse
+from app.core.middleware import APIKeyAuthMiddleware
 
 
 # ── Lifespan Handler ───────────────────────────────────────────────────────
@@ -66,7 +67,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS Middleware ────────────────────────────────────────────────────────
 app.add_middleware(
 	CORSMiddleware,
 	allow_origins=ALLOWED_ORIGINS,
@@ -74,6 +74,8 @@ app.add_middleware(
 	allow_methods=["*"],
 	allow_headers=["*"],
 )
+
+app.add_middleware(APIKeyAuthMiddleware)
 
 # ── Prometheus Instrumentation ──────────────────────────────────────────────
 try:
