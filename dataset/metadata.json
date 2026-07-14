@@ -1,0 +1,65 @@
+{
+    "current_version": "v1.0.0",
+    "history": [
+        {
+            "version": "v1.0.0",
+            "timestamp": "2026-07-14 20:28:02",
+            "description": "Initial automated dataset versioning setup",
+            "totals": {
+                "image_count": 2649,
+                "annotation_count": 4546,
+                "class_count": 6,
+                "total_size_mb": 37.039,
+                "class_distribution": {
+                    "0": 776,
+                    "1": 1054,
+                    "2": 888,
+                    "3": 481,
+                    "4": 713,
+                    "5": 634
+                }
+            },
+            "splits": {
+                "train": {
+                    "image_count": 2109,
+                    "annotation_count": 3273,
+                    "total_size_mb": 29.354,
+                    "class_distribution": {
+                        "0": 582,
+                        "1": 733,
+                        "2": 613,
+                        "3": 342,
+                        "4": 523,
+                        "5": 480
+                    }
+                },
+                "val": {
+                    "image_count": 360,
+                    "annotation_count": 832,
+                    "total_size_mb": 5.134,
+                    "class_distribution": {
+                        "0": 129,
+                        "1": 204,
+                        "2": 184,
+                        "3": 92,
+                        "4": 118,
+                        "5": 105
+                    }
+                },
+                "test": {
+                    "image_count": 180,
+                    "annotation_count": 441,
+                    "total_size_mb": 2.551,
+                    "class_distribution": {
+                        "0": 65,
+                        "1": 117,
+                        "2": 91,
+                        "3": 47,
+                        "4": 72,
+                        "5": 49
+                    }
+                }
+            }
+        }
+    ]
+}
