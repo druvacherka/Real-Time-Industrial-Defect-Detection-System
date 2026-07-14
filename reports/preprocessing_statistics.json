@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-13 18:13:35",
+  "timestamp": "2026-07-14 21:49:53",
   "target_size": [
     640,
     640
@@ -20,13 +20,13 @@
     ]
   },
   "save_format": ".png",
-  "total_processed": 2470,
+  "total_processed": 2649,
   "total_skipped": 0,
   "per_split": {
     "train": {
-      "processed": 1930,
+      "processed": 2109,
       "skipped": 0,
-      "total": 1930
+      "total": 2109
     },
     "val": {
       "processed": 360,
@@ -40,14 +40,14 @@
     }
   },
   "timing": {
-    "mean_ms": 42.03,
-    "median_ms": 40.71,
-    "total_seconds": 103.82,
+    "mean_ms": 84.53,
+    "median_ms": 78.62,
+    "total_seconds": 223.92,
     "stages_mean_ms": {
-      "read": 1.57,
-      "resize": 0.88,
-      "normalize": 7.16,
-      "save": 32.41
+      "read": 6.1,
+      "resize": 1.27,
+      "normalize": 12.76,
+      "save": 51.3
     }
   }
 }

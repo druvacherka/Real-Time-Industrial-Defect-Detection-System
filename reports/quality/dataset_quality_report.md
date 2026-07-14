@@ -43,7 +43,7 @@ This report provides an automated validation summary of the NEU Metal Surface De
 
 ## 6. Bounding Box & Annotation Consistency
 
-- **Total bounding boxes checked**: 5852
+- **Total bounding boxes checked**: 5853
 - **Total consistency/class errors**: 0
 
 ### Class Distribution (Valid annotations)
@@ -51,7 +51,7 @@ This report provides an automated validation summary of the NEU Metal Surface De
 | Class ID | Class Name | Annotations |
 | --- | --- | --- |
 | 0 | crazing | 976 |
-| 1 | inclusion | 1083 |
+| 1 | inclusion | 1084 |
 | 2 | patches | 1017 |
 | 3 | pitted_surface | 880 |
 | 4 | rolled-in_scale | 965 |

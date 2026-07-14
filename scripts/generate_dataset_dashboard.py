@@ -107,6 +107,39 @@ def calculate_bbox_dimensions(labels_dir: Path, splits: List[str]) -> Dict[str, 
     }
 
 
+def calculate_image_resolutions(images_dir: Path, splits: List[str]) -> Dict[str, Any]:
+    """
+    Scan image files to compute image resolution statistics.
+    """
+    resolutions: Dict[str, int] = {}
+    total_scanned = 0
+    unique_resolutions = set()
+    
+    for split in splits:
+        img_split_dir = images_dir / split
+        if not img_split_dir.exists():
+            continue
+            
+        for img_path in img_split_dir.iterdir():
+            if img_path.is_file() and img_path.suffix.lower() in IMAGE_EXTENSIONS:
+                try:
+                    img = cv2.imread(str(img_path))
+                    if img is not None:
+                        h, w = img.shape[:2]
+                        res_str = f"{w}x{h}"
+                        resolutions[res_str] = resolutions.get(res_str, 0) + 1
+                        unique_resolutions.add((w, h))
+                        total_scanned += 1
+                except Exception as exc:
+                    logger.warning("Could not read image %s for resolution check: %s", img_path.name, exc)
+                    
+    return {
+        "total_scanned": total_scanned,
+        "resolution_counts": resolutions,
+        "unique_resolutions_count": len(unique_resolutions)
+    }
+
+
 def generate_charts(stats: Dict[str, Any], class_names: List[str], output_dir: Path) -> Tuple[Path, Path]:
     """
     Generate class distribution and split pie charts.
@@ -214,6 +247,7 @@ def write_dashboard_report(
     report_path: Path,
     stats: Dict[str, Any],
     bbox_stats: Dict[str, Any],
+    image_res_stats: Dict[str, Any],
     class_names: List[str],
     sample_images: List[str]
 ) -> None:
@@ -241,11 +275,21 @@ def write_dashboard_report(
         f"- **Average Aspect Ratio (W/H)**: {bbox_stats['mean_aspect_ratio']:.2f}",
         f"- **Standard Deviation (Width/Height)**: {bbox_stats['std_width']:.4f} / {bbox_stats['std_height']:.4f}",
         "",
+        "## 2.5. Image Resolution Analysis",
+        "",
+        f"- **Total Scanned Images**: {image_res_stats.get('total_scanned', 0)}",
+        f"- **Unique Image Resolutions Found**: {image_res_stats.get('unique_resolutions_count', 0)}",
+        "**Resolution Breakdown**:",
+    ]
+    for res_str, count in image_res_stats.get('resolution_counts', {}).items():
+        lines.append(f"  - `{res_str}`: {count} images")
+    lines.extend([
+        "",
         "## 3. Dataset Splits Distribution",
         "",
         "| Split | Image Count | Label Count | Total Annotations | Density (Bboxes/Img) |",
         "| --- | --- | --- | --- | --- |",
-    ]
+    ])
     
     for split, info in stats["splits"].items():
         density = info['total_annotations'] / max(1, info['total_images'])
@@ -319,6 +363,10 @@ def main() -> None:
     logger.info("Calculating bounding box dimension stats...")
     bbox_stats = calculate_bbox_dimensions(LABELS_DIR, SPLITS)
 
+    # Step 2.5: Image resolution analytics
+    logger.info("Scanning image files for resolution reports...")
+    image_res_stats = calculate_image_resolutions(IMAGES_DIR, SPLITS)
+
     # Step 3: Generate visual charts
     logger.info("Generating distribution and split charts...")
     generate_charts(stats, class_names, output_dir)
@@ -329,12 +377,12 @@ def main() -> None:
 
     # Step 5: Save markdown dashboard report
     report_path = output_dir / "dataset_analytics_report.md"
-    write_dashboard_report(report_path, stats, bbox_stats, class_names, sample_images)
+    write_dashboard_report(report_path, stats, bbox_stats, image_res_stats, class_names, sample_images)
 
     # Save stats to JSON as well
     stats_json_path = output_dir / "dataset_analytics.json"
     with open(stats_json_path, "w", encoding="utf-8") as f:
-        json.dump({"stats": stats, "bbox_stats": bbox_stats}, f, indent=2)
+        json.dump({"stats": stats, "bbox_stats": bbox_stats, "image_res_stats": image_res_stats}, f, indent=2)
 
     logger.info("Dataset analytics dashboard completed successfully.")
 

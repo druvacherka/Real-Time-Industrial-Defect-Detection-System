@@ -16,6 +16,13 @@ This dashboard displays comprehensive visual and numerical analytics computed on
 - **Average Aspect Ratio (W/H)**: 1.18
 - **Standard Deviation (Width/Height)**: 0.2787 / 0.2886
 
+## 2.5. Image Resolution Analysis
+
+- **Total Scanned Images**: 2649
+- **Unique Image Resolutions Found**: 1
+**Resolution Breakdown**:
+  - `200x200`: 2649 images
+
 ## 3. Dataset Splits Distribution
 
 | Split | Image Count | Label Count | Total Annotations | Density (Bboxes/Img) |
@@ -45,23 +52,23 @@ This dashboard displays comprehensive visual and numerical analytics computed on
 
 ## 6. Sample Ground-Truth Bounding Box Overlays
 
-### Split: TRAIN (sample_train_aug_scratches_268_80.jpg)
-![sample_train_aug_scratches_268_80.jpg](sample_train_aug_scratches_268_80.jpg)
+### Split: TRAIN (sample_train_scratches_36.jpg)
+![sample_train_scratches_36.jpg](sample_train_scratches_36.jpg)
 
-### Split: TRAIN (sample_train_patches_163.jpg)
-![sample_train_patches_163.jpg](sample_train_patches_163.jpg)
+### Split: TRAIN (sample_train_rolled-in_scale_146.jpg)
+![sample_train_rolled-in_scale_146.jpg](sample_train_rolled-in_scale_146.jpg)
 
-### Split: VAL (sample_val_patches_263.jpg)
-![sample_val_patches_263.jpg](sample_val_patches_263.jpg)
+### Split: VAL (sample_val_pitted_surface_160.jpg)
+![sample_val_pitted_surface_160.jpg](sample_val_pitted_surface_160.jpg)
 
-### Split: VAL (sample_val_pitted_surface_17.jpg)
-![sample_val_pitted_surface_17.jpg](sample_val_pitted_surface_17.jpg)
+### Split: VAL (sample_val_inclusion_266.jpg)
+![sample_val_inclusion_266.jpg](sample_val_inclusion_266.jpg)
 
-### Split: TEST (sample_test_crazing_281.jpg)
-![sample_test_crazing_281.jpg](sample_test_crazing_281.jpg)
+### Split: TEST (sample_test_scratches_149.jpg)
+![sample_test_scratches_149.jpg](sample_test_scratches_149.jpg)
 
-### Split: TEST (sample_test_patches_230.jpg)
-![sample_test_patches_230.jpg](sample_test_patches_230.jpg)
+### Split: TEST (sample_test_patches_97.jpg)
+![sample_test_patches_97.jpg](sample_test_patches_97.jpg)
 
 ---
 Dashboard report created automatically by `generate_dataset_dashboard.py`.

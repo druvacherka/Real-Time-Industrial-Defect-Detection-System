@@ -93,5 +93,12 @@
     "mean_aspect_ratio": 1.1760210233041337,
     "std_width": 0.27872326297890204,
     "std_height": 0.2885720962027764
+  },
+  "image_res_stats": {
+    "total_scanned": 2649,
+    "resolution_counts": {
+      "200x200": 2649
+    },
+    "unique_resolutions_count": 1
   }
 }
