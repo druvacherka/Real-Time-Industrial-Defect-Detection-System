@@ -33,6 +33,7 @@ from app.schemas.responses import (
 from app.schemas.requests import LiveStreamRequest
 from app.services.image_service import ImagePreprocessingService, ImageValidationError
 from app.services.model_service import get_model_service
+from app.services.queue_manager import get_queue_manager
 from app.core.metrics import PREPROCESSING_TIME, INFERENCE_TIME, TOTAL_LATENCY, REQUEST_COUNTER
 
 logger = logging.getLogger("defect_detection.predict")
@@ -116,16 +117,16 @@ async def _process_image_async(contents: bytes, request_id: str, conf_threshold:
         REQUEST_COUNTER.labels(endpoint="/predict/image", status="preprocessing_failed").inc()
         raise HTTPException(status_code=500, detail="Image preprocessing failed")
 
-    # Offload model inference to prevent event loop blocking
+    # Submit model inference to the FIFO queue to serialize concurrent execution
     try:
-        model_svc = get_model_service()
+        queue_mgr = get_queue_manager()
         start_inf = time.time()
-        prediction_result = await asyncio.to_thread(model_svc.predict_image, processed_image, conf_threshold)
+        prediction_result = await queue_mgr.submit_job(processed_image, conf_threshold, timeout=12.0)
         INFERENCE_TIME.observe(time.time() - start_inf)
     except Exception as exc:
-        logger.error(f"[{request_id}] Inference failed: {exc}")
+        logger.error(f"[{request_id}] Queue/Inference failed: {exc}")
         REQUEST_COUNTER.labels(endpoint="/predict/image", status="inference_failed").inc()
-        raise HTTPException(status_code=500, detail="Model inference failed")
+        raise HTTPException(status_code=500, detail=f"Model inference failed: {str(exc)}")
 
     return preprocess_result, prediction_result
 
