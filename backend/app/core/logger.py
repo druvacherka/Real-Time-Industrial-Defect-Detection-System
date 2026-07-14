@@ -24,29 +24,42 @@ LOG_FORMAT = (
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
+class JSONFormatter(logging.Formatter):
+    """Formats log records as JSON strings for structured log parsers."""
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        log_data = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_data, ensure_ascii=False)
+
+
 def setup_logging() -> logging.Logger:
     """
     Configure and return the root application logger.
 
     Creates two handlers:
-      - Console handler (stdout) for development visibility
-      - Rotating file handler (logs/app.log) for persistent logging
-
-    Returns:
-        Configured Logger instance.
+      - Console handler (stdout) for development visibility (plain text format)
+      - Rotating file handler (logs/app.log) with structured JSON formatting for production
     """
-    # Determine log level based on debug mode
     log_level = logging.DEBUG if DEBUG else logging.INFO
 
-    # Create the logger
     logger = logging.getLogger(APP_NAME)
     logger.setLevel(log_level)
 
-    # Avoid duplicate handlers if called multiple times
     if logger.handlers:
         return logger
 
     formatter = logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT)
+    json_formatter = JSONFormatter(datefmt=DATE_FORMAT)
 
     # ── Console Handler ─────────────────────────────────────────────────
     console_handler = logging.StreamHandler(sys.stdout)
@@ -54,7 +67,7 @@ def setup_logging() -> logging.Logger:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # ── File Handler (rotating, max 5 MB, keep 3 backups) ──────────────
+    # ── File Handler (rotating, structured JSON) ────────────────────────
     file_handler = RotatingFileHandler(
         LOG_FILE,
         maxBytes=5 * 1024 * 1024,  # 5 MB
@@ -62,7 +75,7 @@ def setup_logging() -> logging.Logger:
         encoding="utf-8",
     )
     file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
+    file_handler.setFormatter(json_formatter)
     logger.addHandler(file_handler)
 
     logger.info("Logging initialised — level=%s, file=%s", log_level, LOG_FILE)
@@ -70,15 +83,7 @@ def setup_logging() -> logging.Logger:
 
 
 def get_logger(name: str = None) -> logging.Logger:
-    """
-    Get a child logger scoped to a specific module.
-
-    Args:
-        name: Optional module name for the child logger.
-
-    Returns:
-        Logger instance.
-    """
+    """Get a child logger scoped to a specific module."""
     base = APP_NAME
     if name:
         return logging.getLogger(f"{base}.{name}")

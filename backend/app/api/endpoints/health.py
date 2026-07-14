@@ -51,6 +51,19 @@ async def health_check():
     except Exception as exc:
         logger.error(f"Health check model status verification failed: {exc}")
 
+    # Retrieve queue statistics
+    q_size = 0
+    jobs_count = 0
+    avg_wait = 0.0
+    try:
+        from app.services.queue_manager import get_queue_manager
+        qm = get_queue_manager()
+        q_size = qm.queue.qsize()
+        jobs_count = qm.total_jobs_processed
+        avg_wait = (qm.total_wait_time / jobs_count * 1000) if jobs_count > 0 else 0.0
+    except Exception as exc:
+        logger.error(f"Failed to retrieve queue stats: {exc}")
+
     status = "healthy" if model_loaded else "degraded"
 
     return HealthResponse(
@@ -59,4 +72,7 @@ async def health_check():
         version=APP_VERSION,
         cpu_percent=cpu_usage,
         memory_percent=mem_usage,
+        queue_size=q_size,
+        jobs_processed=jobs_count,
+        avg_queue_wait_ms=round(avg_wait, 2)
     )
