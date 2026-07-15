@@ -14,6 +14,8 @@ from pathlib import Path
 
 from app.core.settings import get_settings
 
+from app.core.inference_config import inference_config
+
 # Load settings singleton
 settings = get_settings()
 
@@ -39,12 +41,12 @@ DEBUG = settings.DEBUG
 
 # ── Model Settings ─────────────────────────────────────────────────────────
 MODEL_WEIGHTS_PATH = settings.MODEL_PATH
-MODEL_CONFIDENCE_THRESHOLD = settings.MODEL_CONFIDENCE_THRESHOLD
-MODEL_IOU_THRESHOLD = settings.MODEL_IOU_THRESHOLD
+MODEL_CONFIDENCE_THRESHOLD = inference_config.conf_threshold
+MODEL_IOU_THRESHOLD = inference_config.iou_threshold
 MODEL_DEVICE = settings.MODEL_DEVICE
 
 # ── Image Preprocessing ───────────────────────────────────────────────────
-INPUT_SIZE = (settings.INPUT_IMAGE_WIDTH, settings.INPUT_IMAGE_HEIGHT)
+INPUT_SIZE = inference_config.image_size
 NORMALIZE_IMAGES = settings.NORMALIZE_IMAGES
 
 # ── CORS Settings ──────────────────────────────────────────────────────────
