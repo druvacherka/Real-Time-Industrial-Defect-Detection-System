@@ -94,14 +94,30 @@ Minority classes in the training split are augmented until every class reaches t
   4. *Save & Format*
 - Saves metrics breakdown to `reports/preprocessing_statistics.json` and a markdown summary to `reports/preprocessing_validation_summary.md`.
 
-### 6. Analytics Dashboard (`scripts/generate_dataset_dashboard.py`)
+### 6. Automated Anomaly Detection (`scripts/detect_anomalies.py`)
+- Scans dataset images and labels split-by-split.
+- Detects image anomalies: blurriness (Laplacian variance), mean brightness out of boundaries, low contrast, and low Shannon entropy.
+- Detects annotation anomalies: malformed label tokens, incorrect class IDs, out of bounds coordinates, and box sanity checks (NaN/Inf).
+- Generates markdown and JSON anomaly logs under `reports/anomalies/`.
+
+### 7. Preprocessing Benchmarks (`scripts/benchmark_preprocessing.py`)
+- Evaluates CPU/Memory throughput across interpolation algorithms (nearest, bilinear, bicubic, area).
+- Measures z-score standardization scaling throughput.
+- Outputs detailed metric tables to `reports/preprocessing_benchmark.md`.
+
+### 8. Quality Scoring Index (`scripts/dataset_quality_score.py`)
+- Compiles an overall composite Dataset Quality Score out of 100.
+- Assesses image dimensions, defect blur variance, Shannon class balance entropy, and annotation error penalties.
+- Saves class distribution plots and maps results to `reports/dataset_quality_report.md`.
+
+### 9. Analytics Dashboard (`scripts/generate_dataset_dashboard.py`)
 - Computes overall dataset statistics.
 - Computes bounding box dimensions, aspect ratio statistics, and box densities.
 - Generates representation charts and split pie charts.
 - Overlays ground-truth annotations on random samples from each split using premium alpha transparency blending (fill factor 25%).
 - Outputs files to `reports/analytics/`.
 
-### 7. Dataset Versioning and Metadata Management (`utils/metadata_manager.py` / `scripts/manage_metadata.py`)
+### 10. Dataset Versioning and Metadata Management (`utils/metadata_manager.py` / `scripts/manage_metadata.py`)
 - Automatic management and tracking of semantic dataset version numbers (e.g. `v1.0.0`, `v1.0.1`, etc.).
 - Compiles metadata metrics (total image counts, bounding boxes per split, total file size, and class distributions).
 - Saves metadata database files directly as JSON to `dataset/metadata.json` for integration support.
@@ -128,6 +144,9 @@ Minority classes in the training split are augmented until every class reaches t
 | Dataset Integrity Report | `reports/dataset_integrity_report.md` |
 | Dataset Quality Inspection | `reports/quality/dataset_quality_report.md` |
 | Dataset Balancing | `reports/dataset_balancing_report.md` |
+| Anomaly Detection Report | `reports/anomalies/anomaly_report.md` / `.json` |
+| Preprocessing Benchmark Report | `reports/preprocessing_benchmark.md` |
+| Dataset Quality Scoring Report | `reports/dataset_quality_report.md` |
 | Preprocessing statistics | `reports/preprocessing_statistics.json` |
 | Preprocessing validation | `reports/preprocessing_validation_summary.md` |
 | Dataset Analytics Dashboard | `reports/analytics/dataset_analytics_report.md` |

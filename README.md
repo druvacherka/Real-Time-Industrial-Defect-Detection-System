@@ -152,10 +152,19 @@ python scripts/augment_dataset.py
 # Step 7: Preprocess split images concurrently (resizing, normalising, corruption check)
 python scripts/preprocess_pipeline.py
 
-# Step 8: Generate dataset analytics dashboard and visualizations (generates reports/analytics/dataset_analytics_report.md)
+# Step 8: Run automated dataset anomaly detection (generates reports/anomalies/anomaly_report.md)
+python scripts/detect_anomalies.py
+
+# Step 9: Benchmark preprocessing transforms (generates reports/preprocessing_benchmark.md)
+python scripts/benchmark_preprocessing.py
+
+# Step 10: Compute composite dataset quality score and generate distribution charts (generates reports/dataset_quality_report.md)
+python scripts/dataset_quality_score.py
+
+# Step 11: Generate dataset analytics dashboard and visualizations (generates reports/analytics/dataset_analytics_report.md)
 python scripts/generate_dataset_dashboard.py
 
-# Step 9: Track dataset versions and generate metadata database (generates dataset/metadata.json)
+# Step 12: Track dataset versions and generate metadata database (generates dataset/metadata.json)
 python scripts/manage_metadata.py
 ```
 
