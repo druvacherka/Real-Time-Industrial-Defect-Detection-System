@@ -20,6 +20,9 @@ class HealthResponse(BaseModel):
     queue_size: Optional[int] = Field(default=None, example=2)
     jobs_processed: Optional[int] = Field(default=None, example=120)
     avg_queue_wait_ms: Optional[float] = Field(default=None, example=15.4)
+    uptime_seconds: Optional[float] = Field(default=None, example=3600.0)
+    total_requests_processed: Optional[int] = Field(default=None, example=150)
+    analytics: Optional[dict] = Field(default=None, description="Detailed backend analytics and metrics")
 
 
 class RootResponse(BaseModel):

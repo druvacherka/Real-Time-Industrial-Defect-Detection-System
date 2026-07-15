@@ -10,6 +10,7 @@ from app.schemas.responses import HealthResponse
 from app.core.config import APP_VERSION
 from app.core.logger import get_logger
 from app.services.model_service import get_model_service
+from app.services.analytics_service import analytics_service
 
 logger = get_logger(__name__)
 
@@ -65,6 +66,7 @@ async def health_check():
         logger.error(f"Failed to retrieve queue stats: {exc}")
 
     status = "healthy" if model_loaded else "degraded"
+    stats = analytics_service.get_stats()
 
     return HealthResponse(
         status=status,
@@ -74,5 +76,8 @@ async def health_check():
         memory_percent=mem_usage,
         queue_size=q_size,
         jobs_processed=jobs_count,
-        avg_queue_wait_ms=round(avg_wait, 2)
+        avg_queue_wait_ms=round(avg_wait, 2),
+        uptime_seconds=stats["uptime_seconds"],
+        total_requests_processed=stats["total_requests_processed"],
+        analytics=stats
     )

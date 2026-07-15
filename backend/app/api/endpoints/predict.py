@@ -34,6 +34,7 @@ from app.schemas.requests import LiveStreamRequest
 from app.services.image_service import ImagePreprocessingService, ImageValidationError
 from app.services.model_service import get_model_service
 from app.services.queue_manager import get_queue_manager
+from app.services.analytics_service import analytics_service
 from app.core.metrics import PREPROCESSING_TIME, INFERENCE_TIME, TOTAL_LATENCY, REQUEST_COUNTER
 
 logger = logging.getLogger("defect_detection.predict")
@@ -239,6 +240,10 @@ async def predict_image(
     processing_time = time.time() - start_time
     TOTAL_LATENCY.observe(processing_time)
     REQUEST_COUNTER.labels(endpoint="/predict/image", status="success").inc()
+    
+    analytics_service.record_request("/predict/image", processing_time)
+    detections_list = [det["class"] for det in prediction_result.get("detections", [])]
+    analytics_service.record_detections(detections_list)
 
     # Convert raw detections to Pydantic DetectionItem list
     detection_items = []
@@ -403,6 +408,12 @@ async def predict_video(
     processing_time = time.time() - start_time
     TOTAL_LATENCY.observe(processing_time)
     REQUEST_COUNTER.labels(endpoint="/predict/video", status="success").inc()
+
+    analytics_service.record_request("/predict/video", processing_time)
+    video_classes = []
+    for item in prediction_result.get("detection_summary", []):
+        video_classes.extend([item["class"]] * item["count"])
+    analytics_service.record_detections(video_classes)
 
     summary_items = []
     for item in prediction_result.get("detection_summary", []):
