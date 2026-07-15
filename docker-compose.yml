@@ -14,10 +14,20 @@ services:
       - API_PORT=8000
       - LOG_DIR=/app/logs
       - UPLOAD_DIR=/app/backend/uploads
+      - API_KEY=$API_KEY
+      - DEBUG=$DEBUG
+      - MODEL_PATH=$MODEL_PATH
+      - INFERENCE_CONFIDENCE_THRESHOLD=$INFERENCE_CONFIDENCE_THRESHOLD
+      - INFERENCE_IOU_THRESHOLD=$INFERENCE_IOU_THRESHOLD
     volumes:
       - api-logs:/app/logs
       - api-uploads:/app/backend/uploads
       - ./models:/app/models
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

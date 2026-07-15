@@ -35,6 +35,11 @@ The following parameters are validated:
 1. **API Key Security**: Checks if the `API_KEY` is still using the default fallback key (`industrial-defect-secret-key`). If so, a security warning is logged.
 2. **Directory Permissions**: Verifies that the logs directory (`logs/`) and uploads folder (`backend/uploads/`) are fully writable by the `appuser` running the process.
 3. **Model Weights presence**: Assures model weights are present at the configured path, falling back to mock predictions if weights are missing.
+4. **Dynamic Inference Parameters**: Loads configurable values from environment variables:
+   - `INFERENCE_CONFIDENCE_THRESHOLD` (Default: 0.25)
+   - `INFERENCE_IOU_THRESHOLD` (Default: 0.45)
+   - `INFERENCE_IMAGE_WIDTH` (Default: 640)
+   - `INFERENCE_IMAGE_HEIGHT` (Default: 640)
 
 ---
 
