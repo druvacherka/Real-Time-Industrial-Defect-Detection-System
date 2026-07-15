@@ -1,28 +1,24 @@
-# ============================================================
-# Preprocessing Configuration — NEU Metal Surface Defects
-# ============================================================
-# Used by: scripts/preprocess_pipeline.py
-# ============================================================
+# Preprocessing Pipeline Configurations
 
-# Target dimensions for resizing: [width, height]
-target_size: [640, 640]
+# Target resizing configuration
+resize:
+  width: 200
+  height: 200
+  interpolation: "bilinear" # Options: nearest, bilinear, bicubic, area
 
-# Interpolation algorithm to use: "linear", "cubic", "area", "lanczos"
-interpolation: "linear"
-
-# Pixel Normalization Settings
+# Normalization configuration
 normalization:
   enabled: true
-  # Options:
-  #   "min_max"  - Scale pixels from [0, 255] to [0.0, 1.0]
-  #   "imagenet" - Min-max scale, then standardize using ImageNet mean/std
-  #   "standard" - Standardize using dataset mean/std
-  type: "min_max"
+  type: "standard" # Options: min_max, standard (z-score)
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
 
-# Concurrency setting (number of CPU processes to use)
-num_workers: 4
+# Augmentation pipeline integration
+augmentation:
+  enabled: false
+  min_visibility: 0.3
 
-# Format to save processed images: ".png" or ".npy"
-save_format: ".png"
+# Output configuration
+output:
+  format: ".png" # Options: .png, .jpg, .npy
+  jpeg_quality: 95
