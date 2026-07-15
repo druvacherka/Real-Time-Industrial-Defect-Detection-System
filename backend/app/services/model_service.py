@@ -28,36 +28,47 @@ class ModelService:
     """
 
     def __init__(self, model_path: Optional[Path] = None, conf_threshold: float = 0.25):
+        import threading
         self.model_path = model_path
         self.conf_threshold = conf_threshold
         self.model_wrapper: Optional[YOLOv8ModelWrapper] = None
-        self.load_model()
+        self._lock = threading.Lock()
 
     def load_model(self) -> bool:
         """
-        Load the YOLOv8 model wrapper into memory.
+        Load the YOLOv8 model wrapper into memory. Thread-safe implementation.
         """
-        try:
-            logger.info("ModelService: loading YOLO model wrapper...")
-            if self.model_path:
-                self.model_wrapper = YOLOv8ModelWrapper(
-                    model_path=self.model_path,
-                    confidence_threshold=self.conf_threshold,
-                )
-                self.model_wrapper.load_model()
-            else:
-                self.model_wrapper = get_model()
-            logger.info("ModelService: model loaded successfully")
+        if self.model_wrapper is not None and getattr(self.model_wrapper, "is_loaded", False):
             return True
-        except Exception as exc:
-            logger.error(f"ModelService: failed to load model: {exc}")
-            self.model_wrapper = None
-            return False
+            
+        with self._lock:
+            # Double checked locking pattern
+            if self.model_wrapper is not None and getattr(self.model_wrapper, "is_loaded", False):
+                return True
+            try:
+                logger.info("ModelService: lazy loading YOLO model wrapper...")
+                if self.model_path:
+                    self.model_wrapper = YOLOv8ModelWrapper(
+                        model_path=self.model_path,
+                        confidence_threshold=self.conf_threshold,
+                    )
+                    self.model_wrapper.load_model()
+                else:
+                    self.model_wrapper = get_model()
+                logger.info("ModelService: model loaded successfully")
+                return True
+            except Exception as exc:
+                logger.error(f"ModelService: failed to load model: {exc}", exc_info=True)
+                self.model_wrapper = None
+                return False
 
     def predict_image(self, processed_image: np.ndarray, conf_threshold: Optional[float] = None) -> Dict[str, Any]:
         """
         Run inference on preprocessed image array with optional confidence threshold override.
         """
+        if self.model_wrapper is None:
+            self.load_model()
+            
         if not self.model_wrapper:
             logger.error("ModelService: predict_image failed (model not loaded)")
             raise RuntimeError("YOLO model is not loaded in memory")
@@ -86,6 +97,9 @@ class ModelService:
         Run inference on video file frame-by-frame using OpenCV with optional confidence threshold override.
         Accumulates detection results across frames.
         """
+        if self.model_wrapper is None:
+            self.load_model()
+            
         if not self.model_wrapper:
             logger.error("ModelService: predict_video failed (model not loaded)")
             raise RuntimeError("YOLO model is not loaded in memory")
