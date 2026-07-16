@@ -55,6 +55,15 @@ async def lifespan(application: FastAPI):
         APP_VERSION,
     )
 
+    try:
+        from app.services.model_service import get_model_service
+        logger.info("Lifespan: pre-loading YOLO model service...")
+        model_svc = get_model_service()
+        model_svc.load_model()
+        logger.info("Lifespan: YOLO model service preloaded successfully.")
+    except Exception as exc:
+        logger.error(f"Lifespan: failed to preload model service: {exc}")
+
     yield  # application runs here
 
     # ── Shutdown ────────────────────────────────────────────────────────

@@ -47,7 +47,7 @@ class Settings(BaseSettings):
         description="Path to the YOLOv8 model weights file",
     )
     MODEL_CONFIDENCE_THRESHOLD: float = Field(
-        default=0.25,
+        default=0.15,
         ge=0.0,
         le=1.0,
         description="Minimum confidence for detections",

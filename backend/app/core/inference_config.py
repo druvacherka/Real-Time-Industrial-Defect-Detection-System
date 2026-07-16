@@ -18,7 +18,7 @@ class InferenceConfig:
     """
     def __init__(self) -> None:
         # Confidence threshold [0.0, 1.0]
-        self.conf_threshold: float = self._load_float("INFERENCE_CONFIDENCE_THRESHOLD", 0.25, 0.0, 1.0)
+        self.conf_threshold: float = self._load_float("INFERENCE_CONFIDENCE_THRESHOLD", 0.15, 0.0, 1.0)
         # IoU threshold [0.0, 1.0]
         self.iou_threshold: float = self._load_float("INFERENCE_IOU_THRESHOLD", 0.45, 0.0, 1.0)
         # Image dimensions (width, height)

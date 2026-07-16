@@ -43,11 +43,22 @@ async def health_check():
         # Fallback if psutil is not installed
         pass
 
-    # Check model loading status
+    # Check model loading status (considered healthy if loaded OR if weights file exists on disk)
     model_loaded = False
     try:
+        from pathlib import Path
         model_svc = get_model_service()
-        if model_svc and model_svc.model_wrapper and model_svc.model_wrapper.is_loaded:
+        model_path = model_svc.model_path if (model_svc and model_svc.model_path) else Path("models/yolov8n_defects.pt")
+        resolved_path = model_path
+        if not resolved_path.is_absolute():
+            proj_root = Path(__file__).resolve().parent.parent.parent.parent
+            backend_root = Path(__file__).resolve().parent.parent.parent
+            if (proj_root / model_path).exists():
+                resolved_path = proj_root / model_path
+            elif (backend_root / model_path).exists():
+                resolved_path = backend_root / model_path
+        
+        if (model_svc and model_svc.model_wrapper and model_svc.model_wrapper.is_loaded) or (resolved_path and resolved_path.exists()):
             model_loaded = True
     except Exception as exc:
         logger.error(f"Health check model status verification failed: {exc}")

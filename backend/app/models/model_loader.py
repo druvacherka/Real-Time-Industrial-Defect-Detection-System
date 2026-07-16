@@ -19,7 +19,7 @@ logger = logging.getLogger("defect_detection.model_loader")
 
 # Default model configuration
 DEFAULT_MODEL_PATH = Path("models/yolov8n_defects.pt")
-DEFAULT_CONFIDENCE_THRESHOLD = 0.25
+DEFAULT_CONFIDENCE_THRESHOLD = 0.15
 DEFAULT_IOU_THRESHOLD = 0.45
 DEFAULT_INPUT_SIZE = (640, 640)
 
@@ -116,65 +116,92 @@ class YOLOv8ModelWrapper:
         Load the YOLOv8 model from disk.
 
         Returns True if successful, False otherwise.
-        When no trained model is available, initializes in placeholder mode.
         """
-        logger.info(f"Loading model from {self.model_path}...")
+        # Robust path resolution to handle different entry-point cwd (FastAPI vs pytest)
+        resolved_path = self.model_path
+        if not resolved_path.is_absolute():
+            proj_root = Path(__file__).resolve().parent.parent.parent.parent
+            backend_root = Path(__file__).resolve().parent.parent.parent
+            if (proj_root / self.model_path).exists():
+                resolved_path = proj_root / self.model_path
+            elif (backend_root / self.model_path).exists():
+                resolved_path = backend_root / self.model_path
 
-        if self.model_path.exists():
+        logger.info(f"Loading model from resolved path: {resolved_path}...")
+
+        if resolved_path.exists():
             try:
-                # Future: from ultralytics import YOLO
-                # self.model = YOLO(str(self.model_path))
-                logger.info("Model file found — placeholder mode active")
+                from ultralytics import YOLO
+                self.model = YOLO(str(resolved_path))
+                logger.info(f"YOLO Model loaded successfully from {resolved_path}")
                 self.is_loaded = True
             except Exception as exc:
                 logger.error(f"Failed to load model: {exc}")
                 return False
         else:
             logger.warning(
-                f"Model file not found at {self.model_path}. "
-                "Running in placeholder mode."
+                f"Model file not found at {resolved_path}. "
+                "Running in fallback mode."
             )
-            self.is_loaded = True  # Allow placeholder predictions
+            fallback_pt = Path("yolov8n.pt")
+            if not fallback_pt.is_absolute():
+                proj_root = Path(__file__).resolve().parent.parent.parent.parent
+                if (proj_root / fallback_pt).exists():
+                    fallback_pt = proj_root / fallback_pt
+            
+            if fallback_pt.exists():
+                try:
+                    from ultralytics import YOLO
+                    self.model = YOLO(str(fallback_pt))
+                    logger.info(f"YOLO Model loaded successfully from fallback {fallback_pt}")
+                    self.is_loaded = True
+                except Exception as exc:
+                    logger.error(f"Failed to load fallback model: {exc}")
+                    return False
+            else:
+                return False
 
         return self.is_loaded
 
     def _run_inference(self, image: np.ndarray) -> List[DetectionResult]:
         """
-        Run model inference on a preprocessed image.
-
-        Currently returns placeholder detections.
-        Replace this method body with real YOLO inference when ready.
-
-        Args:
-            image: Preprocessed image as NumPy array (RGB, resized).
-
-        Returns:
-            List of DetectionResult objects.
+        Run model inference on a preprocessed image using the real YOLOv8 model.
         """
-        # ---- PLACEHOLDER PREDICTIONS ----
-        # Simulates what the real model would return
-        placeholder_detections = [
-            DetectionResult(
-                class_name="scratches",
-                class_id=5,
-                confidence=0.96,
-                bounding_box=[120, 80, 240, 210],
-            ),
-            DetectionResult(
-                class_name="inclusion",
-                class_id=1,
-                confidence=0.87,
-                bounding_box=[50, 30, 180, 160],
-            ),
-        ]
+        if not self.is_loaded or self.model is None:
+            raise RuntimeError("YOLO model is not loaded in memory")
 
-        # Filter by confidence threshold
-        filtered = [
-            d for d in placeholder_detections
-            if d.confidence >= self.confidence_threshold
-        ]
+        # Convert image back to uint8 [0, 255] range if it was normalized (float32 in [0, 1])
+        # to ensure YOLO's internal preprocessing handles it correctly without double-normalization.
+        if image.dtype == np.float32 or image.dtype == np.float64:
+            if image.max() <= 1.01:
+                image = (image * 255.0).clip(0, 255).astype(np.uint8)
+            else:
+                image = image.clip(0, 255).astype(np.uint8)
 
-        return filtered
+        # Run inference using the real custom-trained YOLO model
+        results = self.model(image, conf=self.confidence_threshold, iou=self.iou_threshold, verbose=False)
+        
+        detections = []
+        if len(results) > 0:
+            result = results[0]
+            boxes = result.boxes
+            for box in boxes:
+                xyxy = box.xyxy[0].tolist()
+                cls_id = int(box.cls[0].item())
+                conf = float(box.conf[0].item())
+                class_name = DEFECT_CLASSES.get(cls_id, "unknown")
+                
+                # convert coordinates to list of ints
+                bbox = [int(val) for val in xyxy]
+                
+                detections.append(DetectionResult(
+                    class_name=class_name,
+                    class_id=cls_id,
+                    confidence=conf,
+                    bounding_box=bbox
+                ))
+
+        return detections
 
     def predict(self, image: np.ndarray) -> PredictionResponse:
         """

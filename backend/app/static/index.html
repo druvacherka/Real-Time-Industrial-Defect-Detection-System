@@ -7,20 +7,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #080B10;
-            --panel-bg: rgba(15, 22, 36, 0.45);
-            --panel-border: rgba(255, 255, 255, 0.08);
-            --primary: #6366F1;
-            --primary-glow: rgba(99, 102, 241, 0.15);
+            --bg-color: #030712;
+            --panel-bg: rgba(17, 24, 39, 0.45);
+            --panel-border: rgba(255, 255, 255, 0.05);
+            --primary: #F59E0B;
+            --primary-glow: rgba(245, 158, 11, 0.15);
             --accent-cyan: #06B6D4;
             --accent-green: #10B981;
-            --accent-orange: #F59E0B;
+            --accent-orange: #F97316;
             --accent-red: #EF4444;
             --accent-purple: #8B5CF6;
-            --text-main: #F3F4F6;
+            --text-main: #F9FAFB;
             --text-muted: #9CA3AF;
             --font-display: 'Plus Jakarta Sans', sans-serif;
             --font-body: 'Outfit', sans-serif;
+            --classy-gold: #D4AF37;
         }
 
         * {
@@ -33,11 +34,13 @@
             background-color: var(--bg-color);
             color: var(--text-main);
             font-family: var(--font-body);
-            overflow-x: hidden;
-            min-height: 100vh;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
             background-image: 
-                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.06) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 40%);
+                radial-gradient(circle at 10% 20%, rgba(245, 158, 11, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.02) 0%, transparent 40%);
         }
 
         header {
@@ -62,14 +65,14 @@
         .logo-icon {
             width: 2.5rem;
             height: 2.5rem;
-            background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
+            background: linear-gradient(135deg, var(--primary), var(--classy-gold));
             border-radius: 0.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
             font-family: var(--font-display);
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
         }
 
         h1 {
@@ -114,6 +117,11 @@
             padding: 1.5rem 2.5rem;
             max-width: 1800px;
             margin: 0 auto;
+            flex: 1;
+            min-height: 0;
+            height: calc(100vh - 80px);
+            box-sizing: border-box;
+            align-items: stretch;
         }
 
         @media (max-width: 1200px) {
@@ -132,6 +140,9 @@
             display: flex;
             flex-direction: column;
             gap: 1.25rem;
+            height: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .card-title {
@@ -212,10 +223,10 @@
 
         /* Viewport and Canvas Overlay */
         .viewport-card {
-            min-height: 500px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            min-height: 0;
         }
 
         .viewer-container {
@@ -227,7 +238,7 @@
             border-radius: 0.75rem;
             overflow: hidden;
             position: relative;
-            min-height: 400px;
+            min-height: 200px;
             border: 1px solid var(--panel-border);
         }
 
@@ -235,12 +246,12 @@
             position: relative;
             display: inline-block;
             max-width: 100%;
-            max-height: 600px;
+            max-height: 100%;
         }
 
         .preview-img {
             max-width: 100%;
-            max-height: 600px;
+            max-height: 100%;
             display: block;
             border-radius: 0.5rem;
         }
@@ -284,8 +295,11 @@
 
         /* Results table */
         .results-section {
-            max-height: 250px;
+            height: 180px;
             overflow-y: auto;
+            flex-shrink: 0;
+            border-top: 1px solid var(--panel-border);
+            padding-top: 0.75rem;
         }
 
         table {
@@ -352,30 +366,30 @@
 
         .telemetry-gauge-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--accent-cyan));
+            background: linear-gradient(90deg, var(--primary), var(--classy-gold));
             width: 0%;
             transition: width 0.5s ease-out;
         }
 
         /* Action Buttons */
         .btn {
-            background: linear-gradient(135deg, var(--primary), var(--primary));
+            background: linear-gradient(135deg, var(--primary), var(--classy-gold));
             border: none;
             border-radius: 0.5rem;
             padding: 0.75rem 1rem;
-            color: white;
-            font-weight: 600;
+            color: #080B10;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
             font-family: var(--font-display);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
             text-align: center;
         }
 
         .btn:hover {
             opacity: 0.95;
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
         }
 
         .badge-pulse {
@@ -387,9 +401,10 @@
         }
 
         .tab-btn.active {
-            background-color: var(--primary) !important;
-            color: white !important;
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+            background: linear-gradient(135deg, var(--primary), var(--classy-gold)) !important;
+            color: #080B10 !important;
+            font-weight: 700 !important;
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
         }
 
         @keyframes badge-pulse {
@@ -417,21 +432,6 @@
     <main>
         <!-- Left Side: Controls & Input -->
         <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-            <!-- API Settings Card -->
-            <div class="card">
-                <div class="card-title">🔑 Connection Config</div>
-                <div class="form-group">
-                    <label for="api-key">X-API-Key</label>
-                    <input type="text" id="api-key" value="industrial-defect-secret-key" placeholder="Enter API Secret Key">
-                </div>
-                <div class="form-group">
-                    <div class="range-container">
-                        <label for="conf-threshold">Confidence Threshold</label>
-                        <span id="conf-val" style="font-size: 0.825rem; font-weight: 600; color: var(--primary);">0.25</span>
-                    </div>
-                    <input type="range" id="conf-threshold" min="0.05" max="0.95" step="0.05" value="0.25">
-                </div>
-            </div>
 
             <!-- Upload Area Card -->
             <div class="card">
@@ -466,10 +466,6 @@
 
                 <!-- Live Camera Mode Input -->
                 <div id="live-input-container" style="display: none; flex-direction: column; gap: 1rem;">
-                    <div class="form-group">
-                        <label for="camera-source">Stream Source / WebCam Index</label>
-                        <input type="text" id="camera-source" value="0" placeholder="e.g. 0, rtsp://127.0.0.1:8554/live">
-                    </div>
                     <button class="btn" id="btn-live-connect" onclick="connectLiveStream()">
                         🔌 Connect Live Camera
                     </button>
@@ -501,6 +497,8 @@
 
                 <div class="image-wrapper" id="image-wrapper" style="display: none;">
                     <img id="preview-img" class="preview-img" alt="Defect detection target">
+                    <video id="webcam-video" autoplay playsinline style="display: none; max-width: 100%; border-radius: 0.5rem;"></video>
+                    <canvas id="capture-canvas" style="display: none;"></canvas>
                     <div class="bbox-overlay" id="bbox-overlay"></div>
                 </div>
             </div>
@@ -582,6 +580,8 @@
         let currentDetections = [];
         let simulationInterval = null;
         let activeTab = 'image';
+        let webcamStream = null;
+        let webcamInterval = null;
 
         // UI Element Selectors
         const fileInput = document.getElementById("file-input");
@@ -589,20 +589,15 @@
         const videoFileInput = document.getElementById("video-file-input");
         const videoDropZone = document.getElementById("video-drop-zone");
         const previewImg = document.getElementById("preview-img");
+        const webcamVideo = document.getElementById("webcam-video");
+        const captureCanvas = document.getElementById("capture-canvas");
         const imageWrapper = document.getElementById("image-wrapper");
         const viewerPlaceholder = document.getElementById("viewer-placeholder");
         const bboxOverlay = document.getElementById("bbox-overlay");
         const resultsTable = document.getElementById("results-table");
         const resultsTbody = document.getElementById("results-tbody");
         const detectionBadge = document.getElementById("detection-summary-badge");
-        const apiKeyInput = document.getElementById("api-key");
-        const confThreshold = document.getElementById("conf-threshold");
-        const confValText = document.getElementById("conf-val");
-
-        // Set Slider Display Value
-        confThreshold.oninput = function() {
-            confValText.innerText = this.value;
-        };
+        const apiKey = "industrial-defect-secret-key";
 
         // Tab Toggle Logic
         function setTab(tabName) {
@@ -733,7 +728,6 @@
         }
 
         async function sendPredictionRequest(file) {
-            const apiKey = apiKeyInput.value;
             const headers = new Headers();
             if (apiKey) {
                 headers.append("X-API-Key", apiKey);
@@ -742,7 +736,7 @@
             const formData = new FormData();
             formData.append("file", file);
             
-            const conf = confThreshold.value;
+            const conf = 0.05;
             const url = `/predict/image?conf_threshold=${conf}`;
             
             bboxOverlay.innerHTML = "";
@@ -778,7 +772,6 @@
 
         // Video prediction handler
         async function handleVideoUpload(file) {
-            const apiKey = apiKeyInput.value;
             const headers = new Headers();
             if (apiKey) {
                 headers.append("X-API-Key", apiKey);
@@ -787,7 +780,7 @@
             const formData = new FormData();
             formData.append("file", file);
             
-            const conf = confThreshold.value;
+            const conf = 0.15;
             const url = `/predict/video?conf_threshold=${conf}`;
             
             viewerPlaceholder.innerHTML = `
@@ -852,22 +845,40 @@
             }
         }
 
+        function stopWebcam() {
+            if (webcamInterval) {
+                clearInterval(webcamInterval);
+                webcamInterval = null;
+            }
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            webcamVideo.srcObject = null;
+            webcamVideo.style.display = "none";
+            previewImg.style.display = "block";
+            
+            const connectBtn = document.getElementById("btn-live-connect");
+            connectBtn.innerText = "🔌 Connect Live Camera";
+            connectBtn.style.background = "linear-gradient(135deg, var(--primary), var(--primary))";
+        }
+
         // Live camera connection handler
         async function connectLiveStream() {
-            const apiKey = apiKeyInput.value;
-            const headers = new Headers();
-            headers.append("Content-Type", "application/json");
-            if (apiKey) {
-                headers.append("X-API-Key", apiKey);
+            const connectBtn = document.getElementById("btn-live-connect");
+            
+            if (webcamStream || webcamInterval) {
+                stopWebcam();
+                return;
             }
             
-            const source = document.getElementById("camera-source").value;
+            stopSimulation();
             
             viewerPlaceholder.innerHTML = `
                 <div style="text-align: center; color: var(--text-main);">
                     <div style="font-size: 2.5rem; margin-bottom: 0.5rem; animation: pulse 1.5s infinite;">🔌</div>
-                    <p style="font-size: 1.1rem; font-weight:600;">Connecting Live Stream...</p>
-                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Initiating handshake and frame grab test.</p>
+                    <p style="font-size: 1.1rem; font-weight:600;">Accessing Local Webcam...</p>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Please grant camera permissions if prompted by browser.</p>
                 </div>
             `;
             viewerPlaceholder.style.display = "flex";
@@ -876,51 +887,103 @@
             detectionBadge.style.display = "none";
             
             try {
-                const response = await fetch("/predict/live", {
-                    method: "POST",
-                    headers: headers,
-                    body: JSON.stringify({ source: source })
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 640 }
                 });
                 
-                if (response.ok) {
-                    const result = await response.json();
-                    const pred = result.prediction;
-                    
-                    viewerPlaceholder.innerHTML = `
-                        <div style="text-align: center; color: var(--text-main); padding: 2rem;">
-                            <div style="font-size: 3rem; color: var(--accent-green); margin-bottom: 0.75rem;">📡</div>
-                            <p style="font-size: 1.2rem; font-weight:700;">Live Feed Active</p>
-                            <p style="font-size: 0.85rem; color: var(--accent-green); font-weight:600;">Status: CONNECTED</p>
-                            <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
-                                <div>Target FPS: <span style="color:var(--text-main); font-weight:600;">${pred.fps.toFixed(0)}</span></div>
-                                <div>Resolution: <span style="color:var(--text-main); font-weight:600;">${pred.video_resolution.join('x')}</span></div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Trigger the visual simulator to show how detections occur on the live stream
-                    setTimeout(() => {
-                        simulateLiveFeed();
-                    }, 1500);
-                } else {
-                    const err = await response.json();
-                    viewerPlaceholder.innerHTML = `
-                        <div style="text-align: center; color: var(--accent-red); padding: 2rem;">
-                            <div style="font-size: 3rem; margin-bottom: 0.5rem;">❌</div>
-                            <p style="font-size: 1.1rem; font-weight:700;">Connection Failed</p>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">${err.detail || "Verification failed."}</p>
-                        </div>
-                    `;
-                }
+                webcamStream = stream;
+                webcamVideo.srcObject = stream;
+                webcamVideo.style.display = "block";
+                previewImg.style.display = "none";
+                viewerPlaceholder.style.display = "none";
+                imageWrapper.style.display = "inline-block";
+                
+                connectBtn.innerText = "⏹ Disconnect Camera";
+                connectBtn.style.background = "var(--accent-red)";
+                
+                detectionBadge.style.display = "inline-block";
+                detectionBadge.style.background = "rgba(16, 185, 129, 0.1)";
+                detectionBadge.style.color = "var(--accent-green)";
+                detectionBadge.style.borderColor = "rgba(16, 185, 129, 0.2)";
+                detectionBadge.innerText = `📡 LIVE WEBCAM ACTIVE`;
+                
+                webcamVideo.onloadedmetadata = () => {
+                    startWebcamInferenceLoop();
+                };
             } catch (err) {
+                console.error("Webcam access error:", err);
                 viewerPlaceholder.innerHTML = `
                     <div style="text-align: center; color: var(--accent-red); padding: 2rem;">
                         <div style="font-size: 3rem; margin-bottom: 0.5rem;">❌</div>
-                        <p style="font-size: 1.1rem; font-weight:700;">Network Error</p>
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Could not connect to backend.</p>
+                        <p style="font-size: 1.1rem; font-weight:700;">Webcam Permission Denied</p>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Could not access camera device.</p>
                     </div>
                 `;
             }
+        }
+
+        function startWebcamInferenceLoop() {
+            const ctx = captureCanvas.getContext("2d");
+            
+            const runPrediction = async () => {
+                if (!webcamStream) return;
+                
+                captureCanvas.width = webcamVideo.videoWidth || 640;
+                captureCanvas.height = webcamVideo.videoHeight || 640;
+                
+                ctx.drawImage(webcamVideo, 0, 0, captureCanvas.width, captureCanvas.height);
+                
+                captureCanvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    
+                    const headers = new Headers();
+                    if (apiKey) {
+                        headers.append("X-API-Key", apiKey);
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append("file", blob, "webcam_frame.jpg");
+                    
+                    const conf = 0.15;
+                    const url = `/predict/image?conf_threshold=${conf}`;
+                    
+                    const startTime = performance.now();
+                    
+                    try {
+                        const response = await fetch(url, {
+                            method: "POST",
+                            headers: headers,
+                            body: formData
+                        });
+                        
+                        const latency = performance.now() - startTime;
+                        document.getElementById("tele-latency").innerText = `${latency.toFixed(0)} ms`;
+                        
+                        if (response.ok && webcamStream) {
+                            const result = await response.json();
+                            currentDetections = result.prediction.detections;
+                            renderBoundingBoxes();
+                            renderResultsTable(result.prediction.detections);
+                            
+                            if (currentDetections.length > 0) {
+                                detectionBadge.style.background = "rgba(239, 68, 68, 0.1)";
+                                detectionBadge.style.color = "var(--accent-red)";
+                                detectionBadge.style.borderColor = "rgba(239, 68, 68, 0.2)";
+                                detectionBadge.innerText = `📡 LIVE WEBCAM: ${currentDetections.length} DEFECTS`;
+                            } else {
+                                detectionBadge.style.background = "rgba(16, 185, 129, 0.1)";
+                                detectionBadge.style.color = "var(--accent-green)";
+                                detectionBadge.style.borderColor = "rgba(16, 185, 129, 0.2)";
+                                detectionBadge.innerText = `📡 LIVE WEBCAM ACTIVE (No Defects)`;
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Webcam prediction error:", err);
+                    }
+                }, "image/jpeg", 0.7);
+            };
+            
+            webcamInterval = setInterval(runPrediction, 350);
         }
 
         // Draw bboxes
@@ -928,11 +991,19 @@
             bboxOverlay.innerHTML = "";
             if (!currentDetections || currentDetections.length === 0) return;
             
-            const imgWidth = previewImg.clientWidth;
-            const imgHeight = previewImg.clientHeight;
+            const isWebcam = (webcamStream !== null);
+            const displayEl = isWebcam ? webcamVideo : previewImg;
             
-            const scaleX = imgWidth / currentImageWidth;
-            const scaleY = imgHeight / currentImageHeight;
+            const imgWidth = displayEl.clientWidth;
+            const imgHeight = displayEl.clientHeight;
+            
+            const nativeWidth = isWebcam ? webcamVideo.videoWidth : currentImageWidth;
+            const nativeHeight = isWebcam ? webcamVideo.videoHeight : currentImageHeight;
+            
+            if (!nativeWidth || !nativeHeight) return;
+            
+            const scaleX = imgWidth / nativeWidth;
+            const scaleY = imgHeight / nativeHeight;
             
             currentDetections.forEach(det => {
                 const box = det.bounding_box;
@@ -986,7 +1057,8 @@
             detectionBadge.style.borderColor = "rgba(239, 68, 68, 0.2)";
             detectionBadge.innerText = `⚠ ${detections.length} Defect(s) Found`;
             
-            detections.forEach(det => {
+            const displayDetections = detections.slice(0, 4);
+            displayDetections.forEach(det => {
                 const color = CLASS_COLORS[det.class] || "var(--primary)";
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
@@ -1104,6 +1176,7 @@
                 btn.innerText = "⚙️ Toggle Simulator";
                 btn.style.background = "rgba(255, 255, 255, 0.08)";
             }
+            stopWebcam();
         }
     </script>
 </body>

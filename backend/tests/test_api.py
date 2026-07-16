@@ -15,10 +15,13 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
 
-client = TestClient(app)
+@pytest.fixture(name="client")
+def client_fixture():
+    with TestClient(app) as c:
+        yield c
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     """Verify GET /health endpoint returns successfully without auth."""
     response = client.get("/health")
     assert response.status_code == 200
@@ -27,7 +30,7 @@ def test_health_endpoint():
     assert "version" in data
 
 
-def test_root_endpoint():
+def test_root_endpoint(client):
     """Verify GET / endpoint returns successfully without auth."""
     response = client.get("/")
     assert response.status_code == 200
@@ -35,7 +38,7 @@ def test_root_endpoint():
     assert "project" in data
 
 
-def test_predict_image_unauthorized():
+def test_predict_image_unauthorized(client):
     """Verify prediction endpoints return 401 when X-API-Key is missing."""
     img = np.zeros((100, 100, 3), dtype=np.uint8)
     _, img_encoded = cv2.imencode(".png", img)
@@ -49,7 +52,7 @@ def test_predict_image_unauthorized():
     assert response.json()["error"] == "unauthorized"
 
 
-def test_predict_image_forbidden():
+def test_predict_image_forbidden(client):
     """Verify prediction endpoints return 403 when X-API-Key is incorrect."""
     img = np.zeros((100, 100, 3), dtype=np.uint8)
     _, img_encoded = cv2.imencode(".png", img)
@@ -64,7 +67,7 @@ def test_predict_image_forbidden():
     assert response.json()["error"] == "forbidden"
 
 
-def test_predict_image_endpoint():
+def test_predict_image_endpoint(client):
     """Verify POST /predict/image endpoint returns successfully with correct API Key."""
     # Create dummy black image
     img = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -83,7 +86,7 @@ def test_predict_image_endpoint():
     assert data["prediction"]["detection_count"] >= 0
 
 
-def test_predict_video_validation():
+def test_predict_video_validation(client):
     """Verify video input validation restricts unsupported formats (with auth)."""
     response = client.post(
         "/predict/video",
@@ -95,7 +98,7 @@ def test_predict_video_validation():
     assert data["error"] == "unsupported_format"
 
 
-def test_predict_live_validation():
+def test_predict_live_validation(client):
     """Verify live endpoint connection failure handling with invalid stream URL (with auth)."""
     response = client.post(
         "/predict/live",
