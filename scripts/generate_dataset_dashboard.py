@@ -298,8 +298,8 @@ def write_dashboard_report(
     lines.append("")
     lines.append("## 4. Class Distribution & Representation Analysis")
     lines.append("")
-    lines.append("| Class ID | Class Name | Total Instances | Percentage (%) | Images Containing Class | Representation Type |")
-    lines.append("| --- | --- | --- | --- | --- | --- |")
+    lines.append("| Class ID | Class Name | Total Instances | Percentage (%) | Images Containing Class | Avg Instances/Image | Representation Type |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     
     total_ann = max(1, overall["total_annotations"])
     for cid in range(len(class_names)):
@@ -307,10 +307,11 @@ def write_dashboard_report(
         count = overall["class_distribution"][cid]
         pct = (count / total_ann) * 100
         img_count = overall["class_images"][cid]
+        avg_density = count / max(1, img_count)
         
         # Simple thresholding logic to print status
         rep_type = "Robust" if pct >= 15 else ("Moderate" if pct >= 10 else "Minority")
-        lines.append(f"| {cid} | {name} | {count} | {pct:.2f}% | {img_count} | {rep_type} |")
+        lines.append(f"| {cid} | {name} | {count} | {pct:.2f}% | {img_count} | {avg_density:.2f} | {rep_type} |")
         
     lines.extend([
         "",
