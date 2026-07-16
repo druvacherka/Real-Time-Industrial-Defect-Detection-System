@@ -45,6 +45,7 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
                 if auth_header and auth_header.startswith("Bearer "):
                     api_key = auth_header.split(" ", 1)[1]
 
+            import hmac
             # Validation
             expected_key = settings.API_KEY
             
@@ -58,10 +59,10 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
                         "error": "unauthorized",
                         "message": "Authentication credentials are missing. Please provide a valid API Key.",
                         "detail": f"Please provide the API key using the header '{self.api_key_header}' or as 'Authorization: Bearer <API_KEY>'."
-                    }
+                     }
                 )
 
-            if api_key != expected_key:
+            if not hmac.compare_digest(api_key, expected_key):
                 logger.warning(
                     f"[Auth] Unauthorized access attempt from IP: {client_ip} to {request.url.path} - Reason: Invalid API Key"
                 )
