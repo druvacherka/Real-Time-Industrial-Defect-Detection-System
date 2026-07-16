@@ -94,9 +94,11 @@ app.add_middleware(APIKeyAuthMiddleware)
 # ── Prometheus Instrumentation ──────────────────────────────────────────────
 try:
     from prometheus_fastapi_instrumentator import Instrumentator
+    from prometheus_client import Counter
+    API_ERROR_COUNTER = Counter("http_api_exceptions_total", "Total count of API exceptions raised", ["exception_type"])
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 except ImportError:
-    pass
+    API_ERROR_COUNTER = None
 
 
 # ── Request/Response Logging Middleware ─────────────────────────────────────
@@ -191,6 +193,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def general_exception_handler(request: Request, exc: Exception):
     logger = get_logger("exceptions")
     logger.exception("Unhandled internal exception during request to %s", request.url.path)
+    if 'API_ERROR_COUNTER' in globals() and API_ERROR_COUNTER is not None:
+        try:
+            API_ERROR_COUNTER.labels(exception_type=type(exc).__name__).inc()
+        except Exception:
+            pass
     return JSONResponse(
         status_code=500,
         content=ErrorResponse(
