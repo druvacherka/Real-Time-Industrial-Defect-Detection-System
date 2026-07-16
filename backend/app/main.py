@@ -194,3 +194,17 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # ── Register Routes ────────────────────────────────────────────────────────
 app.include_router(api_router)
+
+# ── Serve Static Frontend UI ───────────────────────────────────────────────
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
+
+static_dir = Path(__file__).resolve().parent / "static"
+static_dir.mkdir(exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+@app.get("/ui", include_in_schema=False)
+async def serve_ui():
+    return FileResponse(static_dir / "index.html")
