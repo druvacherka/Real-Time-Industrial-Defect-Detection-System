@@ -74,8 +74,8 @@ Runs comprehensive validation on the dataset to verify structure, image-label ma
 - Scans for corrupted/unreadable image files.
 - Computes MD5 checksums to detect duplicate images.
 - Checks for duplicate stems across splits to detect data leakage.
-- Validates annotation consistency: checks number of tokens (exactly 5), numeric parse correctness, coordinate values (between 0.0 and 1.0).
-- **Advanced box checks**: detects overlapping bounding boxes (IoU > 0.90) in the same image, and flags extremely small boxes (relative width/height < 0.005).
+- Validates annotation consistency: checks number of tokens (exactly 5), numeric parse correctness, coordinate values (between 0.0 and 1.0), and flags extreme aspect ratios (width/height > 20.0 or < 0.05).
+- **Advanced box checks**: detects overlapping bounding boxes (IoU > 0.90) in the same image, flags extreme aspect ratios, and flags extremely small boxes (relative width/height < 0.005).
 - Outputs a validation report to `reports/dataset_validation_report.md` and a comprehensive data integrity report to `reports/dataset_integrity_report.md`.
 
 ### 4. Class Balancing via Albumentations (`scripts/augment_dataset.py`)
@@ -112,7 +112,7 @@ Minority classes in the training split are augmented until every class reaches t
 
 ### 9. Analytics Dashboard (`scripts/generate_dataset_dashboard.py`)
 - Computes overall dataset statistics.
-- Computes bounding box dimensions, aspect ratio statistics, and box densities.
+- Computes bounding box dimensions, aspect ratio statistics, and box densities (including class-specific average instances per image).
 - Generates representation charts and split pie charts.
 - Overlays ground-truth annotations on random samples from each split using premium alpha transparency blending (fill factor 25%).
 - Outputs files to `reports/analytics/`.
