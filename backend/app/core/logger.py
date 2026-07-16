@@ -68,6 +68,7 @@ def setup_logging() -> logging.Logger:
     logger.addHandler(console_handler)
 
     # ── File Handler (rotating, structured JSON) ────────────────────────
+    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     file_handler = RotatingFileHandler(
         LOG_FILE,
         maxBytes=5 * 1024 * 1024,  # 5 MB
