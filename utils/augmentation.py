@@ -246,7 +246,10 @@ def balance_dataset_classes(
     logger.info("Submitting %d augmentation jobs to ThreadPoolExecutor...", len(tasks_to_run))
     successful_jobs = 0
     
-    with ThreadPoolExecutor() as executor:
+    import os
+    max_threads = min(32, (os.cpu_count() or 1) * 4)
+    logger.info("Using %d parallel worker threads for augmentation", max_threads)
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
         futures = []
         for task in tasks_to_run:
             src_img, src_lbl, dst_img, dst_lbl, trans, q, cid = task
