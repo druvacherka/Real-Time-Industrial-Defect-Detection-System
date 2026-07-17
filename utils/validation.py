@@ -359,6 +359,22 @@ def validate_annotation_consistency(
                     small.append(err)
                     logger.info("Extremely small box found in %s:%d: size [%.4f, %.4f]", lbl_path.name, line_no, bw, bh)
 
+                # Check for extreme aspect ratio (e.g., aspect ratio > 20.0 or < 0.05)
+                if bw > 0 and bh > 0:
+                    aspect_ratio = bw / bh
+                    if aspect_ratio > 20.0 or aspect_ratio < 0.05:
+                        if "extreme_aspect_ratios" not in report:
+                            report["extreme_aspect_ratios"] = {}
+                        if split not in report["extreme_aspect_ratios"]:
+                            report["extreme_aspect_ratios"][split] = []
+                        report["extreme_aspect_ratios"][split].append({
+                            "file": lbl_path.name,
+                            "line": line_no,
+                            "aspect_ratio": aspect_ratio,
+                            "bbox": [cx, cy, bw, bh]
+                        })
+                        logger.info("Extreme aspect ratio box found in %s:%d: aspect ratio %.4f", lbl_path.name, line_no, aspect_ratio)
+
             # Check for overlapping bounding boxes (IoU > 0.90) in the same file
             for i in range(len(valid_boxes_in_file)):
                 line_i, cls_i, box_i = valid_boxes_in_file[i]
