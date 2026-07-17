@@ -202,6 +202,7 @@ The REST API exposes prediction endpoints for images, videos, and live feeds.
 | `GET` | `/health` | Application Health Status | JSON with CPU/Memory usage metrics |
 | `POST` | `/predict/image` | Image Defect Detection | Multipart Form (`file`: Image upload) |
 | `POST` | `/predict/video` | Video Frame-by-Frame Inference | Multipart Form (`file`: Video upload) |
+| `GET` | `/predict/video/download/{filename}` | Download Annotated Video File | Serve annotated output video |
 | `POST` | `/predict/live` | Live Camera Stream Validation | JSON Body (`source`: RTSP/RTMP URL or Device Index) |
 | `GET` | `/metrics` | Prometheus Metrics Endpoint | Prom-format raw metrics data |
 | `GET` | `/docs` | OpenAPI Swagger UI | Interactive documentation |
@@ -262,9 +263,9 @@ For detailed step-by-step instructions on securing the API endpoints using **API
 | **API** | Image, video, and live stream inference API endpoints | ✅ Complete |
 | **Deployment**| Multi-container Docker Compose configuration | ✅ Complete |
 | **Deployment**| Prometheus & Grafana metrics instrumentation | ✅ Complete |
-| **Integration**| Real weights training & mock model replacement | 🔲 In Progress |
-| **Integration**| ONNX / TensorRT runtime model compilation | 🔲 Planned |
-| **Integration**| Frontend Dashboard UI | 🔲 Planned |
+| **Integration**| Real weights training & mock model replacement | ✅ Complete |
+| **Integration**| ONNX / TensorRT runtime model compilation | ✅ Complete |
+| **Integration**| Frontend Dashboard UI & Real Webcam integration | ✅ Complete |
 
 ---
 

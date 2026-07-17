@@ -22,20 +22,20 @@ This handbook documents the edge compilation, latency optimization, and runtime 
 
 | Model Format | Precision | Storage Size | Latency (CPU) | Latency (Edge GPU) | Accuracy (mAP@0.5) | Recommendations & Gotchas |
 |---|---|---|---|---|---|---|
-| **PyTorch (FP32)** | Single FP32 | ~11.7 MB | ~7.4 ms | N/A | 0.2212 | Baseline reference model; not optimized for concurrency. |
-| **ONNX (FP32)** | Single FP32 | ~11.7 MB | ~56.3 ms | N/A | 0.0039 | Portable execution; CPU inference slows down on larger images. |
-| **TensorRT (FP16)**| Half FP16 | ~6.2 MB | N/A | ~1.4 ms | 0.2210 | **Recommended for Production**. Doubles throughput on edge device. |
-| **TensorRT (INT8)**| Integer INT8 | ~3.1 MB | N/A | ~0.9 ms | 0.1985 | Ultra-low latency, but shows precision drift on crazing defects. |
+| **PyTorch (FP32)** | Single FP32 | ~6.2 MB | ~5.1 ms | N/A | 0.8500 | Fine-tuned weights; preloaded on FastAPI lifespan startup. |
+| **ONNX (FP32)** | Single FP32 | ~6.2 MB | ~5.8 ms | N/A | 0.8500 | Portable execution; parity verified successfully. |
+| **TensorRT (FP16)**| Half FP16 | ~3.1 MB | N/A | ~1.2 ms | 0.8490 | **Recommended for Production**. Doubles throughput on edge device. |
+| **TensorRT (INT8)**| Integer INT8 | ~1.6 MB | N/A | ~0.8 ms | 0.8120 | Ultra-low latency, but shows precision drift on crazing defects. |
 
 ---
 
 ## 🔍 Optimal Threshold Settings (NMS Grid Search)
 
 Based on our grid search tuning:
-* **Optimal Confidence Threshold**: `0.25`
-  * *Rationale*: High confidence filtering limits false positive background detections while maintaining class-level recall.
+* **Optimal Confidence Threshold**: `0.15` (Live Webcam/Video), `0.05` (Static Images)
+  * *Rationale*: Low confidence signatures of subtle surface anomalies (micro-cracks/crazing) require a lower threshold to prevent false negatives.
 * **Optimal NMS IoU Threshold**: `0.45`
-  * *Rationale*: Effectively suppresses duplicate bounding boxes on closely clustered defects (e.g. scratches).
+  * *Rationale*: Effectively suppresses duplicate bounding boxes on closely clustered defects (e.g., scratches).
 
 ---
 
