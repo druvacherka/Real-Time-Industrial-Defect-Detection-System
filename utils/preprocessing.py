@@ -45,9 +45,10 @@ def read_and_validate_image(img_path: Path) -> np.ndarray | None:
         return None
 
 
-def resize_image(image: np.ndarray, target_size: Tuple[int, int], interpolation: int = cv2.INTER_LINEAR) -> np.ndarray:
+def resize_image(image: np.ndarray, target_size: Tuple[int, int], interpolation: int = None) -> np.ndarray:
     """
     Resize image to the specified width and height.
+    Automatically chooses the best interpolation algorithm if not specified.
     
     Args:
         image: Input image array.
@@ -60,6 +61,15 @@ def resize_image(image: np.ndarray, target_size: Tuple[int, int], interpolation:
     h, w = image.shape[:2]
     if (w, h) == target_size:
         return image
+        
+    if interpolation is None:
+        # Downscaling: INTER_AREA is best to avoid aliasing
+        if target_size[0] < w or target_size[1] < h:
+            interpolation = cv2.INTER_AREA
+        # Upscaling: INTER_CUBIC is slower but higher quality than linear
+        else:
+            interpolation = cv2.INTER_CUBIC
+
     return cv2.resize(image, target_size, interpolation=interpolation)
 
 
