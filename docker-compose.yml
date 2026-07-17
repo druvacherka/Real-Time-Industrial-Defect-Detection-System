@@ -29,6 +29,11 @@ services:
           cpus: '2.0'
           memory: 4G
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -45,6 +50,11 @@ services:
     ports:
       - "9090:9090"
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       api:
         condition: service_healthy
@@ -58,6 +68,11 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       prometheus:
         condition: service_started
