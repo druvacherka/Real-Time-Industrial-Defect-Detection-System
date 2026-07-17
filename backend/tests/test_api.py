@@ -28,6 +28,9 @@ def test_health_endpoint(client):
     data = response.json()
     assert data["status"] == "healthy"
     assert "version" in data
+    assert "disk_percent" in data
+    assert isinstance(data["disk_percent"], float)
+    assert 0.0 <= data["disk_percent"] <= 100.0
 
 
 def test_root_endpoint(client):
