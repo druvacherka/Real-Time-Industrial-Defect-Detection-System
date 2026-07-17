@@ -68,3 +68,12 @@ def parse_box_coverage(
     except Exception as exc:
         logger.error("Failed to parse box coverage for %s: %s", label_path, exc)
     return ratios
+
+def calculate_aspect_ratio_variance(aspect_ratios: List[float]) -> float:
+    """
+    Calculate the variance of bounding box aspect ratios.
+    Extremely high variance may indicate irregular annotation distributions.
+    """
+    if len(aspect_ratios) < 2:
+        return 0.0
+    return float(np.var(aspect_ratios))
