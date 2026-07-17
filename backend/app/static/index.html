@@ -449,7 +449,7 @@
                     <input type="file" id="file-input" style="display: none;" accept="image/png, image/jpeg, image/jpg">
                     <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
                         <div class="upload-icon">📸</div>
-                        <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">Select or Drag Steel Image</p>
+                        <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">Select or Drag Metal Image</p>
                         <p style="font-size: 0.75rem; color: var(--text-muted);">Supports JPG, PNG (Max 10MB)</p>
                     </div>
                 </div>
@@ -492,7 +492,7 @@
                 <!-- Viewer instructions -->
                 <div id="viewer-placeholder" style="text-align: center; color: var(--text-muted); padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <p style="font-size: 1.25rem; margin-bottom: 0.5rem;">Waiting for Image Input...</p>
-                    <p style="font-size: 0.85rem;">Upload a hot-rolled steel strip image to detect micro-defects.</p>
+                    <p style="font-size: 0.85rem;">Upload a hot-rolled metal strip image to detect micro-defects.</p>
                 </div>
 
                 <div class="image-wrapper" id="image-wrapper" style="display: none;">
@@ -820,6 +820,9 @@
                                 <div>Resolution: <span style="color:var(--text-main); font-weight:600;">${pred.video_resolution.join('x')}</span></div>
                                 <div>Frames: <span style="color:var(--text-main); font-weight:600;">${pred.frame_count}</span></div>
                             </div>
+                            <a href="${pred.annotated_video_url}" download class="btn" style="margin-top: 1.5rem; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: auto; padding: 0.75rem 1.5rem; font-weight: 600;">
+                                📥 Download Annotated Video
+                            </a>
                         </div>
                     `;
                     
@@ -1042,7 +1045,7 @@
             resultsTable.style.display = "table";
             
             if (detections.length === 0) {
-                resultsTbody.innerHTML = "<tr><td colspan='3' style='text-align: center; color: var(--accent-green); font-weight: 600;'>No Defect Detected. Steel Plate Clean!</td></tr>";
+                resultsTbody.innerHTML = "<tr><td colspan='3' style='text-align: center; color: var(--accent-green); font-weight: 600;'>No Defect Detected. Metal Plate Clean!</td></tr>";
                 detectionBadge.style.display = "inline-block";
                 detectionBadge.style.background = "rgba(16, 185, 129, 0.1)";
                 detectionBadge.style.color = "var(--accent-green)";
@@ -1079,7 +1082,7 @@
             resultsTable.style.display = "table";
             
             if (totalDetections === 0) {
-                resultsTbody.innerHTML = "<tr><td colspan='3' style='text-align: center; color: var(--accent-green); font-weight: 600;'>No Defect Detected in Video. Steel Plate Clean!</td></tr>";
+                resultsTbody.innerHTML = "<tr><td colspan='3' style='text-align: center; color: var(--accent-green); font-weight: 600;'>No Defect Detected in Video. Metal Plate Clean!</td></tr>";
                 detectionBadge.style.display = "inline-block";
                 detectionBadge.style.background = "rgba(16, 185, 129, 0.1)";
                 detectionBadge.style.color = "var(--accent-green)";

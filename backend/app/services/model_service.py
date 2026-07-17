@@ -92,10 +92,15 @@ class ModelService:
         finally:
             self.model_wrapper.confidence_threshold = original_conf
 
-    def predict_video(self, video_path: Path, conf_threshold: Optional[float] = None) -> Dict[str, Any]:
+    def predict_video(
+        self, 
+        video_path: Path, 
+        conf_threshold: Optional[float] = None,
+        output_path: Optional[Path] = None
+    ) -> Dict[str, Any]:
         """
         Run inference on video file frame-by-frame using OpenCV with optional confidence threshold override.
-        Accumulates detection results across frames.
+        Accumulates detection results across frames and optionally writes annotated video to output_path.
         """
         if self.model_wrapper is None:
             self.load_model()
@@ -110,6 +115,17 @@ class ModelService:
 
         start_time = time.time()
         logger.info(f"ModelService: starting video inference pipeline for {video_path}")
+        
+        # Color mapping (BGR format) corresponding to Javascript class colors:
+        CLASS_COLORS_BGR = {
+            "crazing": (68, 68, 239),       # Red
+            "inclusion": (11, 158, 245),    # Orange
+            "patches": (129, 185, 16),      # Green
+            "pitted_surface": (212, 182, 6), # Cyan
+            "rolled-in_scale": (241, 102, 99), # Indigo
+            "scratches": (246, 92, 139)     # Purple
+        }
+
         try:
             import cv2
             cap = cv2.VideoCapture(str(video_path))
@@ -127,13 +143,19 @@ class ModelService:
                 f"fps={fps:.2f}, total_frames={frame_count}, duration={duration:.2f}s"
             )
             
+            # Setup VideoWriter if output_path is provided
+            out = None
+            if output_path:
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                out = cv2.VideoWriter(str(output_path), fourcc, fps if fps > 0 else 30.0, (width, height))
+            
             total_detections = 0
             class_counts = {}
             frame_idx = 0
             processed_frames = 0
             sample_rate = 5
-            batch_size = 8
-            frame_batch = []
+            
+            active_detections = []
 
             while cap.isOpened():
                 ret, frame = cap.read()
@@ -141,34 +163,39 @@ class ModelService:
                     break
 
                 if frame_idx % sample_rate == 0:
-                    # Preprocess frame before inference (BGR -> RGB)
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     frame_resized = cv2.resize(frame_rgb, (640, 640), interpolation=cv2.INTER_LINEAR)
-                    frame_batch.append(frame_resized)
+                    predictions = self.model_wrapper.predict_batch([frame_resized])
+                    active_detections = predictions[0].detections if predictions else []
+                    
+                    for det in active_detections:
+                        total_detections += 1
+                        class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
+                    processed_frames += 1
 
-                    if len(frame_batch) == batch_size:
-                        logger.debug(f"ModelService: processing batch of {len(frame_batch)} frames (idx: {frame_idx})")
-                        predictions = self.model_wrapper.predict_batch(frame_batch)
-                        for prediction in predictions:
-                            for det in prediction.detections:
-                                total_detections += 1
-                                class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
-                        processed_frames += len(frame_batch)
-                        frame_batch.clear()
+                if out:
+                    if active_detections:
+                        for det in active_detections:
+                            box = det.bounding_box
+                            x_min = int(box[0] * (width / 640.0))
+                            y_min = int(box[1] * (height / 640.0))
+                            x_max = int(box[2] * (width / 640.0))
+                            y_max = int(box[3] * (height / 640.0))
+                            
+                            color = CLASS_COLORS_BGR.get(det.class_name, (99, 102, 241))
+                            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), color, 2)
+                            
+                            label = f"{det.class_name} {det.confidence:.2f}"
+                            cv2.putText(frame, label, (x_min, y_min - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                    
+                    out.write(frame)
 
                 frame_idx += 1
 
-            if frame_batch:
-                logger.debug(f"ModelService: processing remaining batch of {len(frame_batch)} frames")
-                predictions = self.model_wrapper.predict_batch(frame_batch)
-                for prediction in predictions:
-                    for det in prediction.detections:
-                        total_detections += 1
-                        class_counts[det.class_name] = class_counts.get(det.class_name, 0) + 1
-                processed_frames += len(frame_batch)
-
             cap.release()
-            logger.info("ModelService: released OpenCV VideoCapture resource")
+            if out:
+                out.release()
+            logger.info("ModelService: released OpenCV resources")
 
             # Format detection summary
             from app.models.model_loader import DEFECT_CLASSES

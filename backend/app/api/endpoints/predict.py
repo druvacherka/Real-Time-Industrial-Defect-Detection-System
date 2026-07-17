@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Optional
 
 import cv2
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query, Security
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Query, Security, BackgroundTasks
+from fastapi.responses import JSONResponse, FileResponse
 from app.core.auth import api_key_header
 
 from app.schemas.responses import (
@@ -296,6 +296,36 @@ def _validate_video_format(filename: str) -> str:
     return ext
 
 
+async def delete_file_after_delay(file_path: Path, delay_seconds: int = 300):
+    """Asynchronously wait and then delete the temporary video file to prevent disk bloat."""
+    await asyncio.sleep(delay_seconds)
+    if file_path.exists():
+        try:
+            os.remove(file_path)
+            logger.info(f"Background cleanup: deleted temporary annotated video at {file_path}")
+        except Exception as e:
+            logger.warning(f"Background cleanup failed for {file_path}: {e}")
+
+
+@router.get(
+    "/video/download/{filename}",
+    summary="Download annotated video file",
+    description="Download a previously processed annotated video file within 5 minutes of prediction.",
+    response_class=FileResponse
+)
+async def download_annotated_video(filename: str):
+    # Sanitize filename
+    safe_filename = os.path.basename(filename)
+    file_path = UPLOAD_DIR / safe_filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Requested file not found or has expired")
+    return FileResponse(
+        path=file_path,
+        media_type="video/mp4",
+        filename=safe_filename
+    )
+
+
 @router.post(
     "/video",
     response_model=UploadVideoResponse,
@@ -315,6 +345,7 @@ def _validate_video_format(filename: str) -> str:
 )
 async def predict_video(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(
         ...,
         description="Video file to analyze for defects (MP4, AVI, MOV)",
@@ -367,6 +398,11 @@ async def predict_video(
     # Step 4 — Save temporarily to disk asynchronously
     save_filename = f"{request_id}_{file.filename}"
     save_path = UPLOAD_DIR / save_filename
+    
+    # Establish output path for the annotated video (Standardized output extension to .mp4)
+    annotated_filename = f"annotated_{request_id}_{Path(file.filename).stem}.mp4"
+    annotated_path = UPLOAD_DIR / annotated_filename
+    
     try:
         await asyncio.to_thread(save_path.write_bytes, contents)
         logger.info(f"[request_id={request_id}] [action=save_temp_video] [status=success] path={save_path}")
@@ -378,16 +414,18 @@ async def predict_video(
     # Step 5 — Run inference with 45-second timeout
     try:
         model_svc = get_model_service()
-        # Offload CPU-bound frame-by-frame video decoding and inference to thread pool
         start_inf = time.time()
         prediction_result = await asyncio.wait_for(
-            asyncio.to_thread(model_svc.predict_video, save_path, conf_threshold),
+            asyncio.to_thread(model_svc.predict_video, save_path, conf_threshold, annotated_path),
             timeout=45.0
         )
         INFERENCE_TIME.observe(time.time() - start_inf)
         if prediction_result.get("status") == "error":
             raise ValueError(prediction_result.get("error_message", "Unknown error"))
         logger.info(f"[request_id={request_id}] [action=predict_video] [status=completed_inference]")
+        
+        # Schedule deletion of the annotated temporary video
+        background_tasks.add_task(delete_file_after_delay, annotated_path, 300)
     except asyncio.TimeoutError:
         logger.error(f"[request_id={request_id}] [action=predict_video] [status=timeout] timeout_limit=45.0s")
         REQUEST_COUNTER.labels(endpoint="/predict/video", status="timeout").inc()
@@ -397,7 +435,7 @@ async def predict_video(
         REQUEST_COUNTER.labels(endpoint="/predict/video", status="inference_failed").inc()
         raise HTTPException(status_code=500, detail=f"Video processing failed: {str(exc)}")
     finally:
-        # Clean up video file after processing to save disk space
+        # Clean up original source video file after processing to save disk space
         if save_path.exists():
             try:
                 await asyncio.to_thread(os.remove, save_path)
@@ -433,6 +471,7 @@ async def predict_video(
         video_duration_seconds=prediction_result.get("video_duration_seconds", 0.0),
         video_resolution=prediction_result.get("video_resolution", [0, 0]),
         model=prediction_result.get("model", "yolov8n_defects"),
+        annotated_video_url=f"/predict/video/download/{annotated_filename}",
     )
 
     logger.info(

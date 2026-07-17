@@ -108,6 +108,7 @@ class VideoPredictionDetails(BaseModel):
     video_duration_seconds: float = Field(default=0.0, example=4.0)
     video_resolution: List[int] = Field(default_factory=lambda: [1920, 1080])
     model: str = Field(default="yolov8n_defects")
+    annotated_video_url: Optional[str] = Field(default=None, example="/predict/video/download/annotated_some_video.mp4")
 
 
 class UploadVideoResponse(BaseModel):
