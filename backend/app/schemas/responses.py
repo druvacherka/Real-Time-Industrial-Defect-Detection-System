@@ -17,6 +17,7 @@ class HealthResponse(BaseModel):
     service: str = Field(default="Industrial Defect Detection", example="Industrial Defect Detection")
     cpu_percent: float = Field(default=0.0, example=12.5)
     memory_percent: float = Field(default=0.0, example=45.2)
+    disk_percent: float = Field(default=0.0, example=35.6)
     queue_size: Optional[int] = Field(default=None, example=2)
     jobs_processed: Optional[int] = Field(default=None, example=120)
     avg_queue_wait_ms: Optional[float] = Field(default=None, example=15.4)

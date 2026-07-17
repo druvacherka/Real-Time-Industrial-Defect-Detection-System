@@ -35,13 +35,19 @@ async def health_check():
     
     cpu_usage = 0.0
     mem_usage = 0.0
+    disk_usage = 0.0
     try:
         import psutil
         cpu_usage = psutil.cpu_percent()
         mem_usage = psutil.virtual_memory().percent
-    except ImportError:
-        # Fallback if psutil is not installed
-        pass
+        disk_usage = psutil.disk_usage('.').percent
+    except Exception:
+        import shutil
+        try:
+            total, used, free = shutil.disk_usage(".")
+            disk_usage = (used / total) * 100
+        except Exception:
+            pass
 
     # Check model loading status (considered healthy if loaded OR if weights file exists on disk)
     model_loaded = False
@@ -85,6 +91,7 @@ async def health_check():
         version=APP_VERSION,
         cpu_percent=cpu_usage,
         memory_percent=mem_usage,
+        disk_percent=round(disk_usage, 2),
         queue_size=q_size,
         jobs_processed=jobs_count,
         avg_queue_wait_ms=round(avg_wait, 2),
