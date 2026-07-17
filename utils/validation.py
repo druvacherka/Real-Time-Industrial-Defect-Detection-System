@@ -164,19 +164,29 @@ def check_duplicate_images(
 ) -> List[Dict[str, Any]]:
     """
     Identify duplicate images based on MD5 checksum.
+    Optimized by grouping by file size first to minimize disk reading.
     """
-    hash_map: Dict[str, List[str]] = {}
-    
+    size_map: Dict[int, List[Path]] = {}
     for split in splits:
         img_split_dir = images_dir / split
         if not img_split_dir.exists():
             continue
-            
         for img_path in img_split_dir.iterdir():
             if img_path.is_file() and img_path.suffix.lower() in image_extensions:
                 try:
+                    file_size = img_path.stat().st_size
+                    size_map.setdefault(file_size, []).append(img_path)
+                except Exception as exc:
+                    logger.error("Could not get file size for %s: %s", img_path, exc)
+
+    hash_map: Dict[str, List[str]] = {}
+    for size, paths in size_map.items():
+        if len(paths) > 1:
+            for img_path in paths:
+                try:
+                    split_name = img_path.parent.name
                     digest = hashlib.md5(img_path.read_bytes()).hexdigest()
-                    hash_map.setdefault(digest, []).append(f"{split}/{img_path.name}")
+                    hash_map.setdefault(digest, []).append(f"{split_name}/{img_path.name}")
                 except Exception as exc:
                     logger.error("Could not compute hash for %s: %s", img_path, exc)
                     
