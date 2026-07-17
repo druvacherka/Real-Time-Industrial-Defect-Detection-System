@@ -271,6 +271,6 @@ For detailed step-by-step instructions on securing the API endpoints using **API
 
 ## 👥 Collab Contribution Roles
 
-* **Dhruv** (ML Engineer): Authored the training, evaluation, and prediction pipeline logic, data loader utilities, device helpers, configuration manager, metric parsers, and plotting libraries.
+* **Druva** (ML Engineer): Authored the training, evaluation, and prediction pipeline logic, data loader utilities, device helpers, configuration manager, metric parsers, and plotting libraries.
 * **Saniya** (CV & Data Engineer): Built the dataset preprocessing, verification, duplicate detection, pair validation, offline augmentation, and automated markdown reporting suite.
 * **Prajwal** (Backend & Deployment Engineer): Implemented the FastAPI service architecture, image/video/live endpoints, logging/exception handlers, Dockerfile/Docker Compose configs, and Prometheus instrumentation.
